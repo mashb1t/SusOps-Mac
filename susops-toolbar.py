@@ -245,13 +245,24 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Start Proxy")
     def start_proxy(self, _):
-        p = self.load_prefs()
-        print(p)
-        cmd = f"start {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
-        cmd = f"nohup {script} {cmd} >/dev/null 2>&1 &"
-        subprocess.Popen(cmd, shell=True, close_fds=True)
-        rumps.notification("SusOps", "Start Proxy", "Proxy started in background.")
-        self.check_status()
+        """Start the proxy in a fully detached background session using setsid."""
+        prefs = self.load_prefs()
+        print(prefs)
+        cmd = f"{script} start {prefs['ssh_host']} {prefs['socks_port']} {prefs['pac_port']}"
+        shell = os.environ.get('SHELL', '/bin/bash')
+        try:
+            # Launch using bash -lc and detach from UI process
+            subprocess.Popen([
+                shell, '-c', cmd
+            ], stdout=subprocess.DEVNULL,
+               stderr=subprocess.DEVNULL,
+               stdin=subprocess.DEVNULL,
+               preexec_fn=os.setsid,
+               close_fds=True)
+            rumps.notification("SusOps", "Start Proxy", "Proxy started and detached.")
+            self.check_status()
+        except Exception as e:
+            alert_foreground("Error starting proxy", str(e))
 
     @rumps.clicked("Stop Proxy")
     def stop_proxy(self, _):
