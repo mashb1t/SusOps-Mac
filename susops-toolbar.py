@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 from enum import Enum
-from time import sleep
 
 import objc
 import rumps
@@ -15,8 +14,7 @@ from AppKit import (
 )
 from Cocoa import (
     NSPanel, NSTextField, NSMakeRect,
-    NSButton, NSApplication,
-    NSDistributedNotificationCenter
+    NSButton, NSApplication, NSDistributedNotificationCenter
 )
 
 
@@ -50,6 +48,92 @@ def resource_path(rel_path):
 script = resource_path('susops/susops.sh')
 
 
+class TwoFieldPanel(NSPanel):
+
+    def initWithContentRect_styleMask_backing_defer_(
+            self, frame, style, backing, defer
+    ):
+        self = objc.super(TwoFieldPanel, self).initWithContentRect_styleMask_backing_defer_(
+            frame, style, backing, defer
+        )
+        if not self:
+            return None
+
+        self.setLevel_(NSFloatingWindowLevel)
+        content = self.contentView()
+
+        # --- Save/Cancel Buttons ---
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(135, 18, 80, 30))
+        save_btn.setTitle_("Save")
+        save_btn.setBezelStyle_(1)
+        save_btn.setTarget_(self)
+        save_btn.setAction_("save:")
+        content.addSubview_(save_btn)
+
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(225, 18, 80, 30))
+        cancel_btn.setTitle_("Cancel")
+        cancel_btn.setBezelStyle_(1)
+        cancel_btn.setTarget_(self)
+        cancel_btn.setAction_("cancel:")
+        content.addSubview_(cancel_btn)
+
+        return self
+
+    def configure_fields(self, field_defs):
+        """
+        field_defs = [(attr_name, label_text), ...]   # order = top → bottom
+        Builds one label/field row per entry, 40 px vertical spacing.
+        """
+        # purge any old dynamic subviews (labels / text-fields)
+        for view in list(self.contentView().subviews()):
+            if isinstance(view, NSTextField) and view.isEditable():
+                view.removeFromSuperview()
+            elif isinstance(view, NSTextField) and not view.isEditable():
+                if view.stringValue().endswith(':'):
+                    view.removeFromSuperview()
+
+        y = 100
+        for attr, label in field_defs:
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 120, 24))
+            lbl.setStringValue_(label)
+            lbl.setBezeled_(False);
+            lbl.setDrawsBackground_(False)
+            lbl.setEditable_(False)
+            self.contentView().addSubview_(lbl)
+
+            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(140, y, 160, 24))
+            self.contentView().addSubview_(fld)
+            setattr(self, attr, fld)
+            y -= 40
+
+    def run(self):
+        self.center()
+        self.makeKeyAndOrderFront_(None)
+
+    def cancel_(self, sender):
+        self.close()
+
+
+class LocalForwardPanel(TwoFieldPanel):
+    def save_(self, sender):
+        if (self.local_port_field.stringValue().isdigit() and
+                self.remote_port_field.stringValue().isdigit()):
+            cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
+            out, _ = self.parent_app._run_susops(cmd)
+            rumps.notification("SusOps", "Remote Forward Added", out)
+        self.close()
+
+
+class RemoteForwardPanel(TwoFieldPanel):
+    def save_(self, sender):
+        if (self.remote_port_field.stringValue().isdigit() and
+                self.local_port_field.stringValue().isdigit()):
+            cmd = f"add -l {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
+            out, _ = self.parent_app._run_susops(cmd)
+            rumps.notification("SusOps", "Local Forward Added", out)
+        self.close()
+
+
 class PrefsPanel(NSPanel):
     """A floating panel with SSH Host, SOCKS Port & PAC Port fields plus Save/Cancel."""
 
@@ -68,47 +152,47 @@ class PrefsPanel(NSPanel):
         content = self.contentView()
 
         # --- SSH Host ---
-        lbl1 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 156, 100, 24))
+        lbl1 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 140, 100, 24))
         lbl1.setStringValue_("SSH Host:")
         lbl1.setBezeled_(False)
         lbl1.setDrawsBackground_(False)
         lbl1.setEditable_(False)
         content.addSubview_(lbl1)
 
-        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 156, 160, 24))
+        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 140, 160, 24))
         content.addSubview_(self.ssh_field)
 
         # --- SOCKS Port ---
-        lbl2 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 116, 100, 24))
+        lbl2 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 100, 100, 24))
         lbl2.setStringValue_("SOCKS Port:")
         lbl2.setBezeled_(False)
         lbl2.setDrawsBackground_(False)
         lbl2.setEditable_(False)
         content.addSubview_(lbl2)
 
-        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 116, 160, 24))
+        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 100, 160, 24))
         content.addSubview_(self.socks_field)
 
         # --- PAC Port ---
-        lbl3 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 76, 100, 24))
+        lbl3 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 60, 100, 24))
         lbl3.setStringValue_("PAC Port:")
         lbl3.setBezeled_(False)
         lbl3.setDrawsBackground_(False)
         lbl3.setEditable_(False)
         content.addSubview_(lbl3)
 
-        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 76, 160, 24))
+        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 60, 160, 24))
         content.addSubview_(self.pac_field)
 
         # --- Save/Cancel Buttons ---
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(130, 20, 80, 30))
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, 18, 80, 30))
         save_btn.setTitle_("Save")
         save_btn.setBezelStyle_(1)
         save_btn.setTarget_(self)
         save_btn.setAction_("savePreferences:")
         content.addSubview_(save_btn)
 
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(220, 20, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, 18, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
@@ -116,10 +200,6 @@ class PrefsPanel(NSPanel):
         content.addSubview_(cancel_btn)
 
         return self
-
-    def run(self):
-        self.center()
-        self.makeKeyAndOrderFront_(None)
 
     def savePreferences_(self, sender):
         ws = os.path.expanduser("~/.susops")
@@ -144,6 +224,10 @@ class PrefsPanel(NSPanel):
 
     def cancelPreferences_(self, sender):
         self.close()
+
+    def run(self):
+        self.center()
+        self.makeKeyAndOrderFront_(None)
 
 
 class SusOpsApp(rumps.App):
@@ -173,19 +257,23 @@ class SusOpsApp(rumps.App):
         self.update_icon()
 
         self._prefs_panel = None
+        self.local_panel = None
+        self.remote_panel = None
+
         self.menu = [
             rumps.MenuItem("Start Proxy", callback=self.start_proxy),
             rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
             rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
             None,
             rumps.MenuItem("Status", callback=self.check_status_item),
-            None,
-            rumps.MenuItem("Add Host…", callback=self.add_host),
-            rumps.MenuItem("Remove Any…", callback=self.remove_any),
-            None,
             rumps.MenuItem("List All", callback=self.list_hosts),
             None,
-            rumps.MenuItem("Test Host…", callback=self.test_host),
+            rumps.MenuItem("Add Host…", callback=self.add_host),
+            rumps.MenuItem("Add Local Forward…", callback=self.open_local_forward),
+            rumps.MenuItem("Add Remote Forward…", callback=self.open_remote_forward),
+            rumps.MenuItem("Remove Any…", callback=self.remove_any),
+            None,
+            rumps.MenuItem("Test Any…", callback=self.test_host),
             rumps.MenuItem("Test All", callback=self.test_all),
             None,
             rumps.MenuItem("Preferences…", callback=self.open_preferences),
@@ -256,7 +344,6 @@ class SusOpsApp(rumps.App):
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
         prefs = self.load_prefs()
-        print(prefs)
         cmd = f"{script} start {prefs['ssh_host']} {prefs['socks_port']} {prefs['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
@@ -274,7 +361,7 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Stop Proxy")
     def stop_proxy(self, _):
-        output, _ = self._run_susops("stop")
+        output, _ = self._run_susops("stop --keep-ports")
         self.check_status()
 
     @rumps.clicked("Restart Proxy")
@@ -289,28 +376,62 @@ class SusOpsApp(rumps.App):
         output, _ = self._run_susops("ps", False)
         alert_foreground("SusOps Status", output)
 
-    @rumps.clicked("Add Host…")
-    def add_host(self, _):
-        host = rumps.Window("Enter hostname to add:", "SusOps: Add Host").run().text
-        if host:
-            output, _ = self._run_susops(f"add {host}")
-            rumps.notification("SusOps", "Add Host", output)
-
-    @rumps.clicked("Remove Any…")
-    def remove_any(self, _):
-        host = rumps.Window("Enter hostname or port to remove:", "SusOps: Remove Any").run().text
-        if host:
-            output, _ = self._run_susops(f"rm {host}")
-            rumps.notification("SusOps", "Remove Any", output)
-
     @rumps.clicked("List All")
     def list_hosts(self, _):
         output, _ = self._run_susops("ls")
         alert_foreground("SusOps Hosts", output)
 
-    @rumps.clicked("Test Host…")
+    @rumps.clicked("Add Host…")
+    def add_host(self, _):
+        host = rumps.Window("Enter hostname to add:", "SusOps: Add Host", dimensions=(220, 20)).run().text
+        if host:
+            output, _ = self._run_susops(f"add {host}")
+            rumps.notification("SusOps", "Add Host", output)
+
+    @rumps.clicked("Add Local Forward…")
+    def open_local_forward(self, _):
+        if not self.remote_panel:
+            frame = NSMakeRect(0, 0, 320, 150)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            self.remote_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self.remote_panel.setTitle_("Add Local Forward")
+            self.remote_panel.parent_app = self
+
+        self.remote_panel.configure_fields([
+            ('remote_port_field', 'From Remote Port:'),
+            ('local_port_field', 'To Local Port:')
+        ])
+        self.remote_panel.run()
+
+    @rumps.clicked("Add Remote Forward…")
+    def open_remote_forward(self, _):
+        if not self.remote_panel:
+            frame = NSMakeRect(0, 0, 320, 150)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            self.remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self.remote_panel.setTitle_("Add Remote Forward")
+            self.remote_panel.parent_app = self
+
+        self.remote_panel.configure_fields([
+            ('local_port_field', 'From Local Port:'),
+            ('remote_port_field', 'To Remote Port:')
+        ])
+        self.remote_panel.run()
+
+    @rumps.clicked("Remove Any…")
+    def remove_any(self, _):
+        host = rumps.Window("Enter hostname or port to remove:", "SusOps: Remove Any", dimensions=(220, 20)).run().text
+        if host:
+            output, _ = self._run_susops(f"rm {host}")
+            rumps.notification("SusOps", "Remove Any", output)
+
+    @rumps.clicked("Test Any…")
     def test_host(self, _):
-        host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Specific").run().text
+        host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"test {host}")
             alert_foreground("SusOps Test", output)
@@ -338,7 +459,7 @@ class SusOpsApp(rumps.App):
     def open_preferences(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._prefs_panel is None:
-            frame = NSMakeRect(0, 0, 320, 200)
+            frame = NSMakeRect(0, 0, 310, 190)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
