@@ -1,10 +1,9 @@
 import os
 import subprocess
-import rumps
+from enum import Enum
+
 import objc
-from Cocoa import (
-    NSPanel, NSTextField, NSView, NSMakeRect, NSButton, NSAlert, NSApplication
-)
+import rumps
 from AppKit import (
     NSWindowStyleMaskTitled,
     NSWindowStyleMaskClosable,
@@ -12,11 +11,28 @@ from AppKit import (
     NSBackingStoreBuffered,
     NSFloatingWindowLevel
 )
+from Cocoa import (
+    NSPanel, NSTextField, NSMakeRect,
+    NSButton, NSAlert, NSApplication,
+    NSDistributedNotificationCenter
+)
+
+
+class Appearance(Enum):
+    LIGHT = "light"
+    DARK = "dark"
+
+
+class ProcessState(Enum):
+    STOPPED = "stopped"
+    RUNNING = "running"
+
 
 class PrefsPanel(NSPanel):
     """A floating panel with SSH Host, SOCKS Port & PAC Port fields plus Save/Cancel."""
+
     def initWithContentRect_styleMask_backing_defer_(
-        self, frame, style, backing, defer
+            self, frame, style, backing, defer
     ):
         self = objc.super(PrefsPanel, self).initWithContentRect_styleMask_backing_defer_(
             frame, style, backing, defer
@@ -99,9 +115,33 @@ class PrefsPanel(NSPanel):
     def cancelPreferences_(self, sender):
         self.close()
 
+
 class SusOpsApp(rumps.App):
-    def __init__(self):
-        super(SusOpsApp, self).__init__(name="SusOps", quit_button=None)
+    def __init__(self, icon_dir=None):
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.images_dir = icon_dir or os.path.join(self.base_dir, 'images')
+        self.process_state = ProcessState.STOPPED
+
+        # Initialize with no title so only icon is shown
+        super(SusOpsApp, self).__init__(name="SO", icon=None, quit_button=None)
+
+        # Observe theme changes
+        center = NSDistributedNotificationCenter.defaultCenter()
+        selector = objc.selector(
+            self.appearanceChanged_,
+            selector=b'appearanceChanged:',
+            signature=b'v@:@'
+        )
+        center.addObserver_selector_name_object_(
+            self,
+            selector,
+            'AppleInterfaceThemeChangedNotification',
+            None
+        )
+
+        # Set initial icon based on current appearance
+        self.updateIconForAppearance(self.process_state)
+
         self._prefs_panel = None
         self.menu = [
             rumps.MenuItem("Start Proxy", callback=self.start_proxy),
@@ -120,6 +160,22 @@ class SusOpsApp(rumps.App):
             None,
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
+
+    def appearanceChanged_(self, note):
+        # Called when user switches between light/dark mode
+        self.updateIconForAppearance(self.process_state)
+
+    def updateIconForAppearance(self, state=ProcessState.STOPPED):
+        # Determine current appearance and swap icon
+        app = NSApplication.sharedApplication()
+        appearance = app.effectiveAppearance().name()
+
+        if 'Dark' in appearance:
+            appearance_str = 'light'
+        else:
+            appearance_str = 'dark'
+
+        self.icon = os.path.join(self.images_dir, 'logo_' + appearance_str + '_' + state.value + '.svg')
 
     @staticmethod
     def _run_susops(command):
@@ -192,22 +248,16 @@ class SusOpsApp(rumps.App):
     def test_host(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Specific").run().text
         if host:
-            # output = self._run_susops(f"test {host}")
-            # rumps.alert("SusOps Test", output)
             result = self._run_susops(f"test {host}")
             alert = NSAlert.alloc().init()
             alert.setMessageText_("SusOps Test")
-            # leave the official informativeText blank:
             alert.setInformativeText_("")
-            # build a left-aligned text field
             tf = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 300, 60))
             tf.setStringValue_(result)
             tf.setEditable_(False)
             tf.setDrawsBackground_(False)
             tf.setSelectable_(True)
-            # ensure left alignment
-            tf.cell().setAlignment_(0)  # 0 == NSLeftTextAlignment
-            # plug it in and run
+            tf.cell().setAlignment_(0)
             alert.setAccessoryView_(tf)
             alert.addButtonWithTitle_("OK")
             alert.runModal()
@@ -219,6 +269,7 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Preferences…")
     def open_preferences(self, _):
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._prefs_panel is None:
             frame = NSMakeRect(0, 0, 320, 200)
             style = (
@@ -229,7 +280,6 @@ class SusOpsApp(rumps.App):
             self._prefs_panel = PrefsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-        # load into fields
         prefs = self.load_prefs()
         self._prefs_panel.ssh_field.setStringValue_(prefs['ssh_host'])
         self._prefs_panel.socks_field.setStringValue_(prefs['socks_port'])
