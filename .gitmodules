@@ -1,0 +1,3 @@
+[submodule "susops"]
+	path = susops
+	url = git@github.com:mashb1t/susops.git
