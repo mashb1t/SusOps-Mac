@@ -320,6 +320,7 @@ class SusOpsApp(rumps.App):
 
     @staticmethod
     def _run_susops(command, show_alert=True):
+        print(f"Running command: {script} {command}")
         result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
                                 errors="ignore")
         if result.returncode != 0 and show_alert:
@@ -390,20 +391,20 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Add Local Forward…")
     def open_local_forward(self, _):
-        if not self.remote_panel:
+        if not self.local_panel:
             frame = NSMakeRect(0, 0, 320, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
-            self.remote_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self.local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self.remote_panel.setTitle_("Add Local Forward")
-            self.remote_panel.parent_app = self
+            self.local_panel.setTitle_("Add Local Forward")
+            self.local_panel.parent_app = self
 
-        self.remote_panel.configure_fields([
+        self.local_panel.configure_fields([
             ('remote_port_field', 'From Remote Port:'),
             ('local_port_field', 'To Local Port:')
         ])
-        self.remote_panel.run()
+        self.local_panel.run()
 
     @rumps.clicked("Add Remote Forward…")
     def open_remote_forward(self, _):
@@ -433,22 +434,8 @@ class SusOpsApp(rumps.App):
     def test_host(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any", dimensions=(220, 20)).run().text
         if host:
-            output, _ = self._run_susops(f"test {host}")
+            output, _ = self._run_susops(f"test {host}", False)
             alert_foreground("SusOps Test", output)
-
-            # result = self._run_susops(f"test {host}")
-            # alert = NSAlert.alloc().init()
-            # alert.setMessageText_("SusOps Test")
-            # alert.setInformativeText_("")
-            # tf = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 300, 60))
-            # tf.setStringValue_(result)
-            # tf.setEditable_(False)
-            # tf.setDrawsBackground_(False)
-            # tf.setSelectable_(True)
-            # tf.cell().setAlignment_(0)
-            # alert.setAccessoryView_(tf)
-            # alert.addButtonWithTitle_("OK")
-            # alert.runModal()
 
     @rumps.clicked("Test All")
     def test_all(self, _):
@@ -477,6 +464,7 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Quit")
     def quit_app(self, _):
+        self._run_susops("stop --keep-ports")
         rumps.quit_application()
 
 
