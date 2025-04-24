@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 from enum import Enum
+from time import sleep
 
 import objc
 import rumps
@@ -31,9 +32,9 @@ class ProcessState(Enum):
     ERROR = "error"
 
 
-def alert_foreground(title, output):
+def alert_foreground(title, message, ok=None, cancel=None, other=None, icon_path=None) -> int:
     NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-    rumps.alert(title, output)
+    return rumps.alert(title, message, ok, cancel, other, icon_path)
 
 
 def resource_path(rel_path):
@@ -130,7 +131,15 @@ class PrefsPanel(NSPanel):
             val = str(field.stringValue()) + "\n"
             with open(os.path.join(ws, name), "w") as f:
                 f.write(val)
-        rumps.notification("SusOps", "Preferences Saved", "Settings will apply on restart.")
+
+        restart = alert_foreground(
+            "Preferences Saved",
+            "Settings will apply on next start. Restart now?",
+            ok="Yes", cancel="No"
+        )
+
+        if restart == 1:
+            self.parent_app.restart_proxy(None)
         self.close()
 
     def cancelPreferences_(self, sender):
@@ -255,11 +264,10 @@ class SusOpsApp(rumps.App):
             subprocess.Popen([
                 shell, '-c', cmd
             ], stdout=subprocess.DEVNULL,
-               stderr=subprocess.DEVNULL,
-               stdin=subprocess.DEVNULL,
-               preexec_fn=os.setsid,
-               close_fds=True)
-            rumps.notification("SusOps", "Start Proxy", "Proxy started and detached.")
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+                close_fds=True)
             self.check_status()
         except Exception as e:
             alert_foreground("Error starting proxy", str(e))
@@ -267,7 +275,6 @@ class SusOpsApp(rumps.App):
     @rumps.clicked("Stop Proxy")
     def stop_proxy(self, _):
         output, _ = self._run_susops("stop")
-        rumps.notification("SusOps", "Stop Proxy", output)
         self.check_status()
 
     @rumps.clicked("Restart Proxy")
@@ -275,7 +282,6 @@ class SusOpsApp(rumps.App):
         p = self.load_prefs()
         cmd = f"restart {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
         output, _ = self._run_susops(cmd)
-        rumps.notification("SusOps", "Restart Proxy", output)
         self.check_status()
 
     @rumps.clicked("Status")
@@ -341,6 +347,7 @@ class SusOpsApp(rumps.App):
             self._prefs_panel = PrefsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
+            self._prefs_panel.parent_app = self
         prefs = self.load_prefs()
         self._prefs_panel.ssh_field.setStringValue_(prefs['ssh_host'])
         self._prefs_panel.socks_field.setStringValue_(prefs['socks_port'])
