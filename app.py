@@ -214,7 +214,7 @@ class PrefsPanel(NSPanel):
 
         restart = alert_foreground(
             "Preferences Saved",
-            "Settings will apply on next start. Restart now?",
+            "Settings will be applied on next start.\n\nRestart now?",
             ok="Yes", cancel="No"
         )
 
