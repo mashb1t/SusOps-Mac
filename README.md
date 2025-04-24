@@ -1,15 +1,14 @@
 # SusOps Toolbar for macOS 🍏
 
 A tiny, native-feeling **menu-bar companion** for the [**SusOps**](https://github.com/mashb1t/susops) SSH–proxy
-toolkit.
-Built with [`rumps`](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add local /
-remote port-forwards, and tweak settings without touching a terminal.
+toolkit. 
 
-> [!IMPORTANT] 
+Built with [`rumps`](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add
+local / remote port-forwards, and tweak settings without touching a terminal.
+
+> [!IMPORTANT]
 > The core CLI lives in the SusOps repo and is included here as a **git submodule**.  
 > Clone with `--recursive` or run `git submodule update --init` after checkout.
-
----
 
 ## Features
 
@@ -22,8 +21,6 @@ remote port-forwards, and tweak settings without touching a terminal.
 | **Status…**                         | `so ps`                     | Show running state and active forwards.                  |
 | **Preferences…**                    | edit dot‑files              | GUI for SSH host & port defaults; optional auto‑restart. |
 | **Test Host / Test All**            | `so test …`                 | Quick connectivity test dialogs.                         |
-
----
 
 ## Installation (Production)
 
@@ -49,25 +46,23 @@ python setup.py py2app
 open dist/SusOps.app
 ```
 
-> The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`.
-
----
+The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`.
 
 ## Runtime files
 
-| Location                                       | Purpose                         |
-|------------------------------------------------|---------------------------------|
-| `~/.susops/`                                   | Same config files the CLI uses. |
-
----
+| Location     | Purpose                         |
+|--------------|---------------------------------|
+| `~/.susops/` | Same config files the CLI uses. |
 
 ## Requirements (tested with)
 
-* macOS 15.4.1 +
-* Python 3.12 + (for building)
+* macOS 15.4.1+
+* Python 3.12+ (for building)
 * A host with ssh you control 😉
 
----
+## Screenshots
+
+![Menu](screenshots/menu.png)
 
 ## Contributing
 
@@ -76,8 +71,6 @@ open dist/SusOps.app
 3. `python app.py` while hacking UI.
 4. `python setup.py py2app` to test the packaged app.
 5. Open a PR.
-
----
 
 ## License
 
