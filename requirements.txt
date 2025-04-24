@@ -1,0 +1,4 @@
+setuptools==70.3.0
+rumps==0.4.0
+pyobjc-core>=9.2
+pyobjc-framework-Cocoa>=9.2
