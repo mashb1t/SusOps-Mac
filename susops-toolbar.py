@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from enum import Enum
 
 import objc
@@ -13,7 +14,7 @@ from AppKit import (
 )
 from Cocoa import (
     NSPanel, NSTextField, NSMakeRect,
-    NSButton, NSAlert, NSApplication,
+    NSButton, NSApplication,
     NSDistributedNotificationCenter
 )
 
@@ -24,8 +25,28 @@ class Appearance(Enum):
 
 
 class ProcessState(Enum):
-    STOPPED = "stopped"
     RUNNING = "running"
+    STOPPED_PARTIALLY = "stopped_partially"
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+def alert_foreground(title, output):
+    NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+    rumps.alert(title, output)
+
+
+def resource_path(rel_path):
+    # on macOS bundle, resources are in Contents/Resources
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base = sys._MEIPASS
+    else:
+        # running normally: project root
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, rel_path)
+
+
+script = resource_path('susops/susops.sh')
 
 
 class PrefsPanel(NSPanel):
@@ -140,7 +161,7 @@ class SusOpsApp(rumps.App):
         )
 
         # Set initial icon based on current appearance
-        self.updateIconForAppearance(self.process_state)
+        self.update_icon()
 
         self._prefs_panel = None
         self.menu = [
@@ -148,10 +169,12 @@ class SusOpsApp(rumps.App):
             rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
             rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
             None,
-            rumps.MenuItem("Add Host…", callback=self.add_host),
-            rumps.MenuItem("Remove Host…", callback=self.remove_host),
+            rumps.MenuItem("Status", callback=self.check_status_item),
             None,
-            rumps.MenuItem("List Hosts", callback=self.list_hosts),
+            rumps.MenuItem("Add Host…", callback=self.add_host),
+            rumps.MenuItem("Remove Any…", callback=self.remove_any),
+            None,
+            rumps.MenuItem("List All", callback=self.list_hosts),
             None,
             rumps.MenuItem("Test Host…", callback=self.test_host),
             rumps.MenuItem("Test All", callback=self.test_all),
@@ -161,31 +184,50 @@ class SusOpsApp(rumps.App):
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
 
+        self._check_timer = rumps.Timer(self.check_status, 5)
+        self._check_timer.start()
+
+    def check_status(self, _=None):
+        # runs every 5s
+        try:
+            output, returncode = self._run_susops("ps", False)
+        except subprocess.CalledProcessError:
+            output, returncode = "Error running command", -1
+
+        match returncode:
+            case 0:
+                new_state = ProcessState.RUNNING
+            case 1:
+                new_state = ProcessState.STOPPED_PARTIALLY
+            case 2:
+                new_state = ProcessState.STOPPED
+            case _:
+                new_state = ProcessState.ERROR
+
+        if new_state != self.process_state:
+            self.process_state = new_state
+            self.update_icon()
+
     def appearanceChanged_(self, note):
         # Called when user switches between light/dark mode
-        self.updateIconForAppearance(self.process_state)
+        self.update_icon()
 
-    def updateIconForAppearance(self, state=ProcessState.STOPPED):
-        # Determine current appearance and swap icon
+    def update_icon(self):
+        # choose file based on state and appearance
         app = NSApplication.sharedApplication()
         appearance = app.effectiveAppearance().name()
-
-        if 'Dark' in appearance:
-            appearance_str = 'light'
-        else:
-            appearance_str = 'dark'
-
-        self.icon = os.path.join(self.images_dir, 'logo_' + appearance_str + '_' + state.value + '.svg')
+        theme = 'light' if 'Dark' in appearance else 'dark'
+        fname = f"logo_{theme}_{self.process_state.value}.svg"
+        path = os.path.join(self.images_dir, fname)
+        self.icon = path
 
     @staticmethod
-    def _run_susops(command):
-        shell = os.environ.get("SHELL", "/bin/bash")
-        env_prefix = "env -u PYTHONSTARTUP -u PROMPT_COMMAND"
-        full_cmd = f"{env_prefix} {shell} -ic 'susops {command}'"
-        result = subprocess.run(full_cmd, shell=True, capture_output=True, encoding="utf-8", errors="ignore")
-        if result.returncode != 0:
-            rumps.alert(f"Error: {result.stderr.strip()}")
-        return result.stdout.strip()
+    def _run_susops(command, show_alert=True):
+        result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
+                                errors="ignore")
+        if result.returncode != 0 and show_alert:
+            alert_foreground("Error", result.stdout.strip())
+        return result.stdout.strip(), result.returncode
 
     @staticmethod
     def load_prefs():
@@ -201,71 +243,79 @@ class SusOpsApp(rumps.App):
                 prefs[name] = defaults[name]
         return prefs
 
-    @staticmethod
-    def alert_foreground(title, output):
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-        rumps.alert(title, output)
-
     @rumps.clicked("Start Proxy")
     def start_proxy(self, _):
         p = self.load_prefs()
+        print(p)
         cmd = f"start {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
-        output = self._run_susops(cmd)
-        rumps.notification("SusOps", "Start Proxy", output)
+        cmd = f"nohup {script} {cmd} >/dev/null 2>&1 &"
+        subprocess.Popen(cmd, shell=True, close_fds=True)
+        rumps.notification("SusOps", "Start Proxy", "Proxy started in background.")
+        self.check_status()
 
     @rumps.clicked("Stop Proxy")
     def stop_proxy(self, _):
-        output = self._run_susops("stop")
+        output, _ = self._run_susops("stop")
         rumps.notification("SusOps", "Stop Proxy", output)
+        self.check_status()
 
     @rumps.clicked("Restart Proxy")
     def restart_proxy(self, _):
         p = self.load_prefs()
         cmd = f"restart {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
-        output = self._run_susops(cmd)
+        output, _ = self._run_susops(cmd)
         rumps.notification("SusOps", "Restart Proxy", output)
+        self.check_status()
+
+    @rumps.clicked("Status")
+    def check_status_item(self, _):
+        output, _ = self._run_susops("ps", False)
+        alert_foreground("SusOps Status", output)
 
     @rumps.clicked("Add Host…")
     def add_host(self, _):
         host = rumps.Window("Enter hostname to add:", "SusOps: Add Host").run().text
         if host:
-            output = self._run_susops(f"add {host}")
+            output, _ = self._run_susops(f"add {host}")
             rumps.notification("SusOps", "Add Host", output)
 
-    @rumps.clicked("Remove Host…")
-    def remove_host(self, _):
-        host = rumps.Window("Enter hostname to remove:", "SusOps: Remove Host").run().text
+    @rumps.clicked("Remove Any…")
+    def remove_any(self, _):
+        host = rumps.Window("Enter hostname or port to remove:", "SusOps: Remove Any").run().text
         if host:
-            output = self._run_susops(f"rm {host}")
-            rumps.notification("SusOps", "Remove Host", output)
+            output, _ = self._run_susops(f"rm {host}")
+            rumps.notification("SusOps", "Remove Any", output)
 
-    @rumps.clicked("List Hosts")
+    @rumps.clicked("List All")
     def list_hosts(self, _):
-        output = self._run_susops("ls")
-        self.alert_foreground("SusOps Hosts", output)
+        output, _ = self._run_susops("ls")
+        alert_foreground("SusOps Hosts", output)
 
     @rumps.clicked("Test Host…")
     def test_host(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Specific").run().text
         if host:
-            result = self._run_susops(f"test {host}")
-            alert = NSAlert.alloc().init()
-            alert.setMessageText_("SusOps Test")
-            alert.setInformativeText_("")
-            tf = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 300, 60))
-            tf.setStringValue_(result)
-            tf.setEditable_(False)
-            tf.setDrawsBackground_(False)
-            tf.setSelectable_(True)
-            tf.cell().setAlignment_(0)
-            alert.setAccessoryView_(tf)
-            alert.addButtonWithTitle_("OK")
-            alert.runModal()
+            output, _ = self._run_susops(f"test {host}")
+            alert_foreground("SusOps Test", output)
+
+            # result = self._run_susops(f"test {host}")
+            # alert = NSAlert.alloc().init()
+            # alert.setMessageText_("SusOps Test")
+            # alert.setInformativeText_("")
+            # tf = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 300, 60))
+            # tf.setStringValue_(result)
+            # tf.setEditable_(False)
+            # tf.setDrawsBackground_(False)
+            # tf.setSelectable_(True)
+            # tf.cell().setAlignment_(0)
+            # alert.setAccessoryView_(tf)
+            # alert.addButtonWithTitle_("OK")
+            # alert.runModal()
 
     @rumps.clicked("Test All")
     def test_all(self, _):
-        output = self._run_susops("test --all")
-        self.alert_foreground("SusOps Test All", output)
+        output, _ = self._run_susops("test --all")
+        alert_foreground("SusOps Test All", output)
 
     @rumps.clicked("Preferences…")
     def open_preferences(self, _):
