@@ -42,7 +42,7 @@ jobs:
       # 5) Package .app into zip
       - name: Package .app into zip
         working-directory: ./dist
-        run: zip -r ../SusOps.zip SusOps.app
+        run: zip -r SusOps.zip SusOps.app
 
       # 6) Compute SHA256
       - name: Compute SHA256
@@ -72,7 +72,7 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.release.outputs.upload_url }}
-          asset_path: SusOps.zip
+          asset_path: dist/SusOps.zip
           asset_name: SusOps.zip
           asset_content_type: application/zip
         env:
