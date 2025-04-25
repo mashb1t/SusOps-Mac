@@ -67,7 +67,6 @@ jobs:
 
       - name: Bump Homebrew Cask
         run: |
-          brew install homebrew/brew/bump-cask-pr
           brew bump-cask-pr \
             --cask-file ./Casks/susops.rb \
             --version "${{ steps.vars.outputs.version }}" \
