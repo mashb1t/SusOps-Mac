@@ -274,8 +274,8 @@ class SusOpsApp(rumps.App):
             None,
             ("Add", [
                 rumps.MenuItem("Add Domain", callback=self.add_domain),
-                rumps.MenuItem("Add Local Forward", callback=self.open_local_forward),
-                rumps.MenuItem("Add Remote Forward", callback=self.open_remote_forward),
+                rumps.MenuItem("Add Local Forward", callback=self.add_local_forward),
+                rumps.MenuItem("Add Remote Forward", callback=self.add_remote_forward),
             ]),
             ("Remove", [
                 rumps.MenuItem("Remove Domain", callback=self.remove_domain),
@@ -287,8 +287,18 @@ class SusOpsApp(rumps.App):
                 rumps.MenuItem("Test Any", callback=self.test_any),
                 rumps.MenuItem("Test All", callback=self.test_all),
             ]),
+            ("Launch Browser", [
+                ("Chrome", [
+                    rumps.MenuItem("Launch Chrome", callback=self.launch_chrome),
+                    rumps.MenuItem("Open Chrome Proxy Settings", callback=self.launch_chrome_proxy_settings),
+                ]),
+                ("Firefox", [
+                    rumps.MenuItem("Launch Firefox", callback=self.launch_firefox),
+                ]),
+            ]),
             None,
             rumps.MenuItem("Preferences", callback=self.open_preferences),
+            rumps.MenuItem("Reset All", callback=self.reset),
             None,
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
@@ -393,12 +403,14 @@ class SusOpsApp(rumps.App):
         alert_foreground("SusOps Hosts", output)
 
     def add_domain(self, _):
-        host = rumps.Window("Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules", "SusOps: Add Domain", dimensions=(220, 20)).run().text
+        host = rumps.Window(
+            "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules",
+            "SusOps: Add Domain", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"add {host}")
             rumps.notification("SusOps", "Add Domain", output)
 
-    def open_local_forward(self, _):
+    def add_local_forward(self, _):
         if not self.local_panel:
             frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
@@ -414,7 +426,7 @@ class SusOpsApp(rumps.App):
         ])
         self.local_panel.run()
 
-    def open_remote_forward(self, _):
+    def add_remote_forward(self, _):
         if not self.remote_panel:
             frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
@@ -431,7 +443,8 @@ class SusOpsApp(rumps.App):
         self.remote_panel.run()
 
     def remove_domain(self, _):
-        host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain", dimensions=(220, 20)).run().text
+        host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain",
+                            dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"rm {host}")
             rumps.notification("SusOps", "Remove Domain", output)
@@ -447,6 +460,15 @@ class SusOpsApp(rumps.App):
         if port:
             output, _ = self._run_susops(f"rm -r {port}")
             rumps.notification("SusOps", "Remove Remote Forward", output)
+
+    def launch_chrome(self, _):
+        output, _ = self._run_susops("chrome", False)
+
+    def launch_chrome_proxy_settings(self, _):
+        output, _ = self._run_susops("chrome-proxy-settings", False)
+
+    def launch_firefox(self, _):
+        output, _ = self._run_susops("firefox", False)
 
     def test_any(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any", dimensions=(220, 20)).run().text
@@ -476,6 +498,16 @@ class SusOpsApp(rumps.App):
         self._prefs_panel.socks_field.setStringValue_(prefs['socks_port'])
         self._prefs_panel.pac_field.setStringValue_(prefs['pac_port'])
         self._prefs_panel.run()
+
+    def reset(self, _):
+        reset = alert_foreground(
+            "Reset Everything?",
+            "This will stop susops and remove all of its configs. You will have to reconfigure the ssh host as well as ports.\n\nAre you sure?",
+            ok="Yes", cancel="No"
+        )
+
+        if reset == 1:
+            self._run_susops("reset --force", False)
 
     def quit_app(self, _):
         self._run_susops("stop --keep-ports", False)
