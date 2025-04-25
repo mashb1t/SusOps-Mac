@@ -63,14 +63,14 @@ class TwoFieldPanel(NSPanel):
         content = self.contentView()
 
         # --- Save/Cancel Buttons ---
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(135, 18, 80, 30))
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(155, 18, 80, 30))
         save_btn.setTitle_("Save")
         save_btn.setBezelStyle_(1)
         save_btn.setTarget_(self)
         save_btn.setAction_("save:")
         content.addSubview_(save_btn)
 
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(225, 18, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(245, 18, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
@@ -94,14 +94,14 @@ class TwoFieldPanel(NSPanel):
 
         y = 100
         for attr, label in field_defs:
-            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 120, 24))
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 140, 24))
             lbl.setStringValue_(label)
             lbl.setBezeled_(False)
             lbl.setDrawsBackground_(False)
             lbl.setEditable_(False)
             self.contentView().addSubview_(lbl)
 
-            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(140, y, 160, 24))
+            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(160, y, 160, 24))
             self.contentView().addSubview_(fld)
             setattr(self, attr, fld)
             y -= 40
@@ -396,7 +396,7 @@ class SusOpsApp(rumps.App):
 
     def open_local_forward(self, _):
         if not self.local_panel:
-            frame = NSMakeRect(0, 0, 320, 150)
+            frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self.local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -405,14 +405,14 @@ class SusOpsApp(rumps.App):
             self.local_panel.parent_app = self
 
         self.local_panel.configure_fields([
-            ('local_port_field', 'From Local Port:'),
-            ('remote_port_field', 'To Remote Port:'),
+            ('remote_port_field', 'Forward Remote Port:'),
+            ('local_port_field', 'To Local Port:'),
         ])
         self.local_panel.run()
 
     def open_remote_forward(self, _):
         if not self.remote_panel:
-            frame = NSMakeRect(0, 0, 320, 150)
+            frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self.remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -421,8 +421,8 @@ class SusOpsApp(rumps.App):
             self.remote_panel.parent_app = self
 
         self.remote_panel.configure_fields([
-            ('remote_port_field', 'From Remote Port:'),
-            ('local_port_field', 'To Local Port:'),
+            ('local_port_field', 'Forward Local Port:'),
+            ('remote_port_field', 'To Remote Port:'),
         ])
         self.remote_panel.run()
 
@@ -433,15 +433,15 @@ class SusOpsApp(rumps.App):
             rumps.notification("SusOps", "Remove Host", output)
 
     def remove_local_forward(self, _):
-        host = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward", dimensions=(220, 20)).run().text
-        if host:
-            output, _ = self._run_susops(f"rm -l {host}")
+        port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward", dimensions=(220, 20)).run().text
+        if port:
+            output, _ = self._run_susops(f"rm -l {port}")
             rumps.notification("SusOps", "Remove Local Forward", output)
 
     def remove_remote_forward(self, _):
-        host = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward", dimensions=(220, 20)).run().text
-        if host:
-            output, _ = self._run_susops(f"rm -r {host}")
+        port = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward", dimensions=(220, 20)).run().text
+        if port:
+            output, _ = self._run_susops(f"rm -r {port}")
             rumps.notification("SusOps", "Remove Remote Forward", output)
 
     def test_any(self, _):
