@@ -96,7 +96,7 @@ class TwoFieldPanel(NSPanel):
         for attr, label in field_defs:
             lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 120, 24))
             lbl.setStringValue_(label)
-            lbl.setBezeled_(False);
+            lbl.setBezeled_(False)
             lbl.setDrawsBackground_(False)
             lbl.setEditable_(False)
             self.contentView().addSubview_(lbl)
@@ -118,7 +118,7 @@ class LocalForwardPanel(TwoFieldPanel):
     def save_(self, sender):
         if (self.local_port_field.stringValue().isdigit() and
                 self.remote_port_field.stringValue().isdigit()):
-            cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
+            cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
             out, _ = self.parent_app._run_susops(cmd)
             rumps.notification("SusOps", "Remote Forward Added", out)
         self.close()
@@ -128,7 +128,7 @@ class RemoteForwardPanel(TwoFieldPanel):
     def save_(self, sender):
         if (self.remote_port_field.stringValue().isdigit() and
                 self.local_port_field.stringValue().isdigit()):
-            cmd = f"add -l {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
+            cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
             out, _ = self.parent_app._run_susops(cmd)
             rumps.notification("SusOps", "Local Forward Added", out)
         self.close()
@@ -401,12 +401,11 @@ class SusOpsApp(rumps.App):
             self.local_panel.parent_app = self
 
         self.local_panel.configure_fields([
-            ('remote_port_field', 'From Remote Port:'),
-            ('local_port_field', 'To Local Port:')
+            ('local_port_field', 'From Local Port:'),
+            ('remote_port_field', 'To Remote Port:'),
         ])
         self.local_panel.run()
 
-    @rumps.clicked("Add Remote Forward…")
     def open_remote_forward(self, _):
         if not self.remote_panel:
             frame = NSMakeRect(0, 0, 320, 150)
@@ -418,8 +417,8 @@ class SusOpsApp(rumps.App):
             self.remote_panel.parent_app = self
 
         self.remote_panel.configure_fields([
-            ('local_port_field', 'From Local Port:'),
-            ('remote_port_field', 'To Remote Port:')
+            ('remote_port_field', 'From Remote Port:'),
+            ('local_port_field', 'To Local Port:'),
         ])
         self.remote_panel.run()
 
