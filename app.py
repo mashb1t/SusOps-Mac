@@ -63,19 +63,19 @@ class TwoFieldPanel(NSPanel):
         content = self.contentView()
 
         # --- Save/Cancel Buttons ---
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(155, 18, 80, 30))
-        save_btn.setTitle_("Save")
-        save_btn.setBezelStyle_(1)
-        save_btn.setTarget_(self)
-        save_btn.setAction_("save:")
-        content.addSubview_(save_btn)
-
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(245, 18, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(155, 18, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancel:")
         content.addSubview_(cancel_btn)
+
+        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(245, 18, 80, 30))
+        add_btn.setTitle_("Add")
+        add_btn.setBezelStyle_(1)
+        add_btn.setTarget_(self)
+        add_btn.setAction_("add:")
+        content.addSubview_(add_btn)
 
         return self
 
@@ -115,7 +115,7 @@ class TwoFieldPanel(NSPanel):
 
 
 class LocalForwardPanel(TwoFieldPanel):
-    def save_(self, sender):
+    def add_(self, sender):
         if (self.local_port_field.stringValue().isdigit() and
                 self.remote_port_field.stringValue().isdigit()):
             cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
@@ -125,7 +125,7 @@ class LocalForwardPanel(TwoFieldPanel):
 
 
 class RemoteForwardPanel(TwoFieldPanel):
-    def save_(self, sender):
+    def add_(self, sender):
         if (self.remote_port_field.stringValue().isdigit() and
                 self.local_port_field.stringValue().isdigit()):
             cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
@@ -185,19 +185,19 @@ class PrefsPanel(NSPanel):
         content.addSubview_(self.pac_field)
 
         # --- Save/Cancel Buttons ---
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, 18, 80, 30))
-        save_btn.setTitle_("Save")
-        save_btn.setBezelStyle_(1)
-        save_btn.setTarget_(self)
-        save_btn.setAction_("savePreferences:")
-        content.addSubview_(save_btn)
-
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, 18, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, 18, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancelPreferences:")
         content.addSubview_(cancel_btn)
+
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, 18, 80, 30))
+        save_btn.setTitle_("Save")
+        save_btn.setBezelStyle_(1)
+        save_btn.setTarget_(self)
+        save_btn.setAction_("savePreferences:")
+        content.addSubview_(save_btn)
 
         return self
 
@@ -405,7 +405,7 @@ class SusOpsApp(rumps.App):
     def add_domain(self, _):
         host = rumps.Window(
             "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules",
-            "SusOps: Add Domain", dimensions=(220, 20)).run().text
+            "SusOps: Add Domain", ok="Add", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"add {host}")
             rumps.notification("SusOps", "Add Domain", output)
@@ -444,19 +444,21 @@ class SusOpsApp(rumps.App):
 
     def remove_domain(self, _):
         host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain",
-                            dimensions=(220, 20)).run().text
+                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"rm {host}")
             rumps.notification("SusOps", "Remove Domain", output)
 
     def remove_local_forward(self, _):
-        port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward", dimensions=(220, 20)).run().text
+        port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward",
+                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if port:
             output, _ = self._run_susops(f"rm -l {port}")
             rumps.notification("SusOps", "Remove Local Forward", output)
 
     def remove_remote_forward(self, _):
-        port = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward", dimensions=(220, 20)).run().text
+        port = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward",
+                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if port:
             output, _ = self._run_susops(f"rm -r {port}")
             rumps.notification("SusOps", "Remove Remote Forward", output)
@@ -471,7 +473,8 @@ class SusOpsApp(rumps.App):
         output, _ = self._run_susops("firefox", False)
 
     def test_any(self, _):
-        host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any", dimensions=(220, 20)).run().text
+        host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any",
+                            ok="Test", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"test {host}", False)
             alert_foreground("SusOps Test", output)
