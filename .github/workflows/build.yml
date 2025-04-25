@@ -47,7 +47,7 @@ jobs:
       # 6) Compute SHA256
       - name: Compute SHA256
         id: sha
-        run: echo "sum=$(shasum -a 256 SusOps.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+        run: echo "sum=$(shasum -a 256 dist/SusOps.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       # 7) Determine version (strip leading 'v')
       - name: Determine version
