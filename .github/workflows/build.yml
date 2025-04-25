@@ -40,8 +40,10 @@ jobs:
         run: python setup.py py2app
 
       # 5) Package .app into zip
-      - name: Package .app
-        run: zip -r SusOps.zip dist/SusOps.app
+      - name: Package .app into zip
+        run: |
+          cd dist
+          zip -r ../SusOps.zip SusOps.app
 
       # 6) Compute SHA256
       - name: Compute SHA256
