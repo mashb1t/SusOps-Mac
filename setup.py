@@ -4,10 +4,8 @@ import stat
 from setuptools import setup
 
 # ------------------- resource paths -------------------
+ICON_FILE = os.path.join('images', 'iconset', 'susops.icns')
 SCRIPT_SRC = os.path.join('susops-cli', 'susops.sh')
-LOGO_FILES = [os.path.join('images', f) for f in os.listdir('images') if os.path.isfile(os.path.join('images', f))]
-
-ICON_FILE = os.path.join('images', 'susops.icns')
 
 # ------------------- make shell script executable -------------------
 st = os.stat(SCRIPT_SRC)
@@ -16,7 +14,9 @@ os.chmod(SCRIPT_SRC, st.st_mode | stat.S_IEXEC)
 # ------------------- py2app lists -------------------
 DATA_FILES = [
     ('susops-cli', [SCRIPT_SRC]),
-    ('images', LOGO_FILES + [ICON_FILE]),
+    (os.path.join('images', 'icons'), [os.path.join('images', 'icons', f) for f in os.listdir(os.path.join('images', 'icons')) if os.path.isfile(os.path.join('images', 'icons', f))]),
+    (os.path.join('images', 'status'), [os.path.join('images', 'status', f) for f in os.listdir(os.path.join('images', 'status')) if os.path.isfile(os.path.join('images', 'status', f))]),
+    ('images/iconset', [ICON_FILE])
 ]
 
 OPTIONS = {

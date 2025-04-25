@@ -173,7 +173,7 @@ class SusOpsApp(rumps.App):
         appearance = app.effectiveAppearance().name()
         theme = 'light' if 'Dark' in appearance else 'dark'
         fname = f"logo_{theme}_{state_value}.svg"
-        path = os.path.join(self.images_dir, fname)
+        path = os.path.join(self.images_dir, "icons", fname)
         self.icon = path
 
     @staticmethod
