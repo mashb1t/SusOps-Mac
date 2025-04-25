@@ -261,20 +261,31 @@ class SusOpsApp(rumps.App):
         self.remote_panel = None
 
         self.menu = [
-            rumps.MenuItem("Start Proxy", callback=self.start_proxy),
-            rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
-            rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
+            ("Proxy", [
+                rumps.MenuItem("Start Proxy", callback=self.start_proxy),
+                rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
+                rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
+                None,
+                rumps.MenuItem("Status", callback=self.check_status_item),
+            ]),
             None,
-            rumps.MenuItem("Status", callback=self.check_status_item),
             rumps.MenuItem("List All", callback=self.list_hosts),
             None,
-            rumps.MenuItem("Add Host…", callback=self.add_host),
-            rumps.MenuItem("Add Local Forward…", callback=self.open_local_forward),
-            rumps.MenuItem("Add Remote Forward…", callback=self.open_remote_forward),
-            rumps.MenuItem("Remove Any…", callback=self.remove_any),
+            ("Add", [
+                rumps.MenuItem("Add Host…", callback=self.add_host),
+                rumps.MenuItem("Add Local Forward…", callback=self.open_local_forward),
+                rumps.MenuItem("Add Remote Forward…", callback=self.open_remote_forward),
+            ]),
+            ("Remove", [
+                rumps.MenuItem("Remove Host…", callback=self.remove_host),
+                rumps.MenuItem("Remove Local Forward…", callback=self.remove_local_forward),
+                rumps.MenuItem("Remove Remote Forward…", callback=self.remove_remote_forward),
+            ]),
             None,
-            rumps.MenuItem("Test Any…", callback=self.test_host),
-            rumps.MenuItem("Test All", callback=self.test_all),
+            ("Test", [
+                rumps.MenuItem("Test Any…", callback=self.test_any),
+                rumps.MenuItem("Test All", callback=self.test_all),
+            ]),
             None,
             rumps.MenuItem("Preferences…", callback=self.open_preferences),
             None,
@@ -341,7 +352,6 @@ class SusOpsApp(rumps.App):
                 prefs[name] = defaults[name]
         return prefs
 
-    @rumps.clicked("Start Proxy")
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
         prefs = self.load_prefs()
@@ -360,36 +370,30 @@ class SusOpsApp(rumps.App):
         except Exception as e:
             alert_foreground("Error starting proxy", str(e))
 
-    @rumps.clicked("Stop Proxy")
     def stop_proxy(self, _):
         output, _ = self._run_susops("stop --keep-ports")
         self.check_status()
 
-    @rumps.clicked("Restart Proxy")
     def restart_proxy(self, _):
         p = self.load_prefs()
         cmd = f"restart {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
         output, _ = self._run_susops(cmd)
         self.check_status()
 
-    @rumps.clicked("Status")
     def check_status_item(self, _):
         output, _ = self._run_susops("ps", False)
         alert_foreground("SusOps Status", output)
 
-    @rumps.clicked("List All")
     def list_hosts(self, _):
         output, _ = self._run_susops("ls")
         alert_foreground("SusOps Hosts", output)
 
-    @rumps.clicked("Add Host…")
     def add_host(self, _):
         host = rumps.Window("Enter hostname to add:", "SusOps: Add Host", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"add {host}")
             rumps.notification("SusOps", "Add Host", output)
 
-    @rumps.clicked("Add Local Forward…")
     def open_local_forward(self, _):
         if not self.local_panel:
             frame = NSMakeRect(0, 0, 320, 150)
@@ -422,26 +426,34 @@ class SusOpsApp(rumps.App):
         ])
         self.remote_panel.run()
 
-    @rumps.clicked("Remove Any…")
-    def remove_any(self, _):
-        host = rumps.Window("Enter hostname or port to remove:", "SusOps: Remove Any", dimensions=(220, 20)).run().text
+    def remove_host(self, _):
+        host = rumps.Window("Enter hostname to remove:", "SusOps: Remove Host", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"rm {host}")
-            rumps.notification("SusOps", "Remove Any", output)
+            rumps.notification("SusOps", "Remove Host", output)
 
-    @rumps.clicked("Test Any…")
-    def test_host(self, _):
+    def remove_local_forward(self, _):
+        host = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward", dimensions=(220, 20)).run().text
+        if host:
+            output, _ = self._run_susops(f"rm -l {host}")
+            rumps.notification("SusOps", "Remove Local Forward", output)
+
+    def remove_remote_forward(self, _):
+        host = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward", dimensions=(220, 20)).run().text
+        if host:
+            output, _ = self._run_susops(f"rm -r {host}")
+            rumps.notification("SusOps", "Remove Remote Forward", output)
+
+    def test_any(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"test {host}", False)
             alert_foreground("SusOps Test", output)
 
-    @rumps.clicked("Test All")
     def test_all(self, _):
         output, _ = self._run_susops("test --all", False)
         alert_foreground("SusOps Test All", output)
 
-    @rumps.clicked("Preferences…")
     def open_preferences(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._prefs_panel is None:
@@ -461,7 +473,6 @@ class SusOpsApp(rumps.App):
         self._prefs_panel.pac_field.setStringValue_(prefs['pac_port'])
         self._prefs_panel.run()
 
-    @rumps.clicked("Quit")
     def quit_app(self, _):
         self._run_susops("stop --keep-ports", False)
         rumps.quit_application()
