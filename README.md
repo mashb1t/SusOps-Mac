@@ -32,15 +32,33 @@ The app may be compatible with older versions of macOS, but it is not tested.
 
 ## Setup
 
+### 1. Install via Homebrew
+
+```bash
+brew tap mashb1t/susops-mac
+brew install --cask susops
+```
+
+For updating, simply run these commands:
+
+```bash
+brew update
+brew upgrade --cask susops
+```
+
+### OR Install manually
+
 1. Download the SusOps.zip file from the [latest release](https://github.com/mashb1t/susops-mac/releases)
 2. Unzip the file
 3. (Optional) Move the SusOps app to your Applications folder
-4. Launch the application
-> [!NOTE]
-> The app is not signed, you may need to allow its startup in **System Settings** > **Privacy & Security**. If this does not 
-5. Set up your SSH host and ports in the **Preferences** menu 
-6. Start the proxy (menu bar icon should turn green)
-7. Add domains (requires browser restart) or port-forwards (requires proxy restart)
+
+### 2. Configure
+
+1. Launch the application
+2. Set up your SSH host and ports in the **Preferences** menu 
+3. Start the proxy (menu bar icon should turn green)
+4. Add domains (requires browser [proxy settings reload](chrome://net-internals/#proxy)) or port-forwards (requires proxy restart)
+
 
 ## Build from source (development)
 
@@ -74,6 +92,17 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 |--------------|---------------------------------|
 | `~/.susops/` | Same config files the CLI uses. |
 
+## Troubleshooting
+
+| Problem                                            | Solution                                                                                                                                                                                 |
+|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **SusOps won't start**                             | You may need to allow its startup in **System Settings** > **Privacy & Security**                                                                                                        |
+| **SUsOps starts, but doesn't show up in menu bar** | MacOS only displays so many menu bar apps. Ensure you don't have too many other items open.                                                                                              |
+| **Proxy doesn't start**                            | Check the **Preferences** menu for correct SSH host and port settings. Ensure you can reach the host directly using `ssh <host>`.                                                        |
+| **Chrome doesn't pick up my added domains**        | Make sure you completely close Chrome and open it again using the **Launch Browser** menu item. Then, open the Chrome Proxy settings and click **Re-apply settings**.                    |
+| **Firefox doesn't pick up my added domains**       | Make sure you completely close Firefox and open it again using the **Launch Browser** menu item.                                                                                         |
+| everything else                                    | see [Troubleshooting Guide SusOps CLI](https://github.com/mashb1t/SusOps-CLI?tab=readme-ov-file#troubleshooting) or [create an issue](https://github.com/mashb1t/SusOps-Mac/issues/new). |
+
 ## Contributing
 
 1. Set up the project as described above in "Build from source (development)".
@@ -84,5 +113,5 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 
 ## License
 
-MIT © 2025 Manuel Schmid — see `LICENSE`.
-[**SusOps CLI**](https://github.com/mashb1t/susops-cli) (submodule) retains its own license.
+MIT © 2025 Manuel Schmid — see [LICENSE](https://github.com/mashb1t/SusOps-Mac/blob/main/LICENSE.txt).
+[**SusOps CLI**](https://github.com/mashb1t/susops-cli) (submodule) retains its own [license](https://github.com/mashb1t/SusOps-CLI/blob/main/LICENSE.txt).
