@@ -41,9 +41,8 @@ jobs:
 
       # 5) Package .app into zip
       - name: Package .app into zip
-        run: |
-          cd dist
-          zip -r ../SusOps.zip SusOps.app
+        working-directory: ./dist
+        run: zip -r ../SusOps.zip SusOps.app
 
       # 6) Compute SHA256
       - name: Compute SHA256
