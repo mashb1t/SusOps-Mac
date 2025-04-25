@@ -1,6 +1,6 @@
 cask "susops" do
-  version "1.0.0-rc7"
-  sha256 "f79e84e200be74786360a8c8fc6e46582b7e5ae87e36448fa7f6d25121ce7a3f"
+  version "1.0.0-rc8"
+  sha256 "fbbbae883ec57565e1055aee3d7d040fdc7abb393ed3cd0a2461a71caff5f1bc"
 
   url "https://github.com/mashb1t/susops-mac/releases/download/v#{version}/SusOps.zip"
   name "SusOps"
