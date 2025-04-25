@@ -152,34 +152,34 @@ class PrefsPanel(NSPanel):
         content = self.contentView()
 
         # --- SSH Host ---
-        lbl1 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 140, 100, 24))
-        lbl1.setStringValue_("SSH Host:")
-        lbl1.setBezeled_(False)
-        lbl1.setDrawsBackground_(False)
-        lbl1.setEditable_(False)
-        content.addSubview_(lbl1)
+        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 140, 100, 24))
+        self.ssh_label.setStringValue_("SSH Host:")
+        self.ssh_label.setBezeled_(False)
+        self.ssh_label.setDrawsBackground_(False)
+        self.ssh_label.setEditable_(False)
+        content.addSubview_(self.ssh_label)
 
         self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 140, 160, 24))
         content.addSubview_(self.ssh_field)
 
         # --- SOCKS Port ---
-        lbl2 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 100, 100, 24))
-        lbl2.setStringValue_("SOCKS Port:")
-        lbl2.setBezeled_(False)
-        lbl2.setDrawsBackground_(False)
-        lbl2.setEditable_(False)
-        content.addSubview_(lbl2)
+        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 100, 100, 24))
+        self.socks_label.setStringValue_("SOCKS Port:")
+        self.socks_label.setBezeled_(False)
+        self.socks_label.setDrawsBackground_(False)
+        self.socks_label.setEditable_(False)
+        content.addSubview_(self.socks_label)
 
         self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 100, 160, 24))
         content.addSubview_(self.socks_field)
 
         # --- PAC Port ---
-        lbl3 = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 60, 100, 24))
-        lbl3.setStringValue_("PAC Port:")
-        lbl3.setBezeled_(False)
-        lbl3.setDrawsBackground_(False)
-        lbl3.setEditable_(False)
-        content.addSubview_(lbl3)
+        self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 60, 100, 24))
+        self.pac_label.setStringValue_("PAC Port:")
+        self.pac_label.setBezeled_(False)
+        self.pac_label.setDrawsBackground_(False)
+        self.pac_label.setEditable_(False)
+        content.addSubview_(self.pac_label)
 
         self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 60, 160, 24))
         content.addSubview_(self.pac_field)
@@ -205,13 +205,18 @@ class PrefsPanel(NSPanel):
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
         # write prefs with newline
-        for name, field in (("ssh_host", self.ssh_field),
-                            ("socks_port", self.socks_field),
-                            ("pac_port", self.pac_field)):
-            val = str(field.stringValue()) + "\n"
+        for name, label, field in (("ssh_host", self.ssh_label, self.ssh_field),
+                                   ("socks_port", self.socks_label, self.socks_field),
+                                   ("pac_port", self.pac_label, self.pac_field)):
+            value_stripped = field.stringValue().strip()
+            if not value_stripped:
+                alert_foreground("Error", f"Field {label.stringValue().replace(":", "")} cannot be empty")
+                return
+            val = str(value_stripped) + "\n"
             with open(os.path.join(ws, name), "w") as f:
                 f.write(val)
 
+        self.close()
         restart = alert_foreground(
             "Preferences Saved",
             "Settings will be applied on next start.\n\nRestart now?",
@@ -220,7 +225,6 @@ class PrefsPanel(NSPanel):
 
         if restart == 1:
             self.parent_app.restart_proxy(None)
-        self.close()
 
     def cancelPreferences_(self, sender):
         self.close()
@@ -337,7 +341,7 @@ class SusOpsApp(rumps.App):
     @staticmethod
     def load_prefs():
         ws = os.path.expanduser("~/.susops")
-        defaults = {"ssh_host": "pi", "socks_port": "1080", "pac_port": "1081"}
+        defaults = {"ssh_host": "", "socks_port": "1080", "pac_port": "1081"}
         prefs = {}
         for name in defaults:
             path = os.path.join(ws, name)
@@ -351,6 +355,10 @@ class SusOpsApp(rumps.App):
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
         prefs = self.load_prefs()
+        if not prefs['ssh_host']:
+            alert_foreground("Startup failed", "Please set the SSH Host in Preferences")
+            self.open_preferences(None)
+            return
         cmd = f"{script} start {prefs['ssh_host']} {prefs['socks_port']} {prefs['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
