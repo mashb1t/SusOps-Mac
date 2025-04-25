@@ -1,12 +1,9 @@
-name: Build macOS App
+name: Build % Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - v*
-  workflow_dispatch:
 
 jobs:
   build:
@@ -32,13 +29,48 @@ jobs:
         run: python setup.py py2app
 
       - name: Package .app into zip
-        run: |
-          cd dist
-          zip -r SusOps.app.zip SusOps.app
+        run: zip -r SusOps.zip dist/SusOps.app
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+#      - name: Upload artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: SusOps
+#          path: dist/SusOps.app.zip
+#          retention-days: 14
+
+      - name: Compute SHA256
+        id: sha
+        run: echo "::set-output name=sum::$(shasum -a 256 SusOps.zip | awk '{print $1}')"
+
+      # Upload to GitHub Release
+      - uses: softprops/action-gh-release@v1
         with:
-          name: SusOps
-          path: dist/SusOps.app.zip
-          retention-days: 14
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.gh_release.outputs.upload_url }}
+          asset_path: SusOps.zip
+          asset_name: SusOps.zip
+          asset_content_type: application/zip
+
+      # Update the Cask version & sha256
+      - name: Bump Homebrew Cask
+        run: |
+          brew install homebrew/brew/bump-cask-pr
+          brew bump-cask-pr \
+            --cask-file ./Casks/susops.rb \
+            --version "${{ github.ref_name }}" \
+            --sha256 "${{ steps.sha.outputs.sum }}" \
+            --no-browse
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Commit & push the updated Cask
+      - uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions
+          author_email: actions@github.com
+          message: "brew: bump SusOps to ${{ github.ref_name }}"
