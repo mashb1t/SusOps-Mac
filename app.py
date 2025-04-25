@@ -438,7 +438,7 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Test All")
     def test_all(self, _):
-        output, _ = self._run_susops("test --all")
+        output, _ = self._run_susops("test --all", False)
         alert_foreground("SusOps Test All", output)
 
     @rumps.clicked("Preferences…")
@@ -463,7 +463,7 @@ class SusOpsApp(rumps.App):
 
     @rumps.clicked("Quit")
     def quit_app(self, _):
-        self._run_susops("stop --keep-ports")
+        self._run_susops("stop --keep-ports", False)
         rumps.quit_application()
 
 
