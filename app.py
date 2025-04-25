@@ -45,7 +45,7 @@ def resource_path(rel_path):
     return os.path.join(base, rel_path)
 
 
-script = resource_path('susops/susops.sh')
+script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
 class TwoFieldPanel(NSPanel):
@@ -261,33 +261,30 @@ class SusOpsApp(rumps.App):
         self.remote_panel = None
 
         self.menu = [
-            ("Proxy", [
-                rumps.MenuItem("Start Proxy", callback=self.start_proxy),
-                rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
-                rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
-                None,
-                rumps.MenuItem("Status", callback=self.check_status_item),
-            ]),
+            rumps.MenuItem("Start Proxy", callback=self.start_proxy),
+            rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
+            rumps.MenuItem("Restart Proxy", callback=self.restart_proxy),
             None,
+            rumps.MenuItem("Check Status", callback=self.check_status_item),
             rumps.MenuItem("List All", callback=self.list_hosts),
             None,
             ("Add", [
-                rumps.MenuItem("Add Host…", callback=self.add_host),
-                rumps.MenuItem("Add Local Forward…", callback=self.open_local_forward),
-                rumps.MenuItem("Add Remote Forward…", callback=self.open_remote_forward),
+                rumps.MenuItem("Add Domain", callback=self.add_domain),
+                rumps.MenuItem("Add Local Forward", callback=self.open_local_forward),
+                rumps.MenuItem("Add Remote Forward", callback=self.open_remote_forward),
             ]),
             ("Remove", [
-                rumps.MenuItem("Remove Host…", callback=self.remove_host),
-                rumps.MenuItem("Remove Local Forward…", callback=self.remove_local_forward),
-                rumps.MenuItem("Remove Remote Forward…", callback=self.remove_remote_forward),
+                rumps.MenuItem("Remove Domain", callback=self.remove_domain),
+                rumps.MenuItem("Remove Local Forward", callback=self.remove_local_forward),
+                rumps.MenuItem("Remove Remote Forward", callback=self.remove_remote_forward),
             ]),
             None,
             ("Test", [
-                rumps.MenuItem("Test Any…", callback=self.test_any),
+                rumps.MenuItem("Test Any", callback=self.test_any),
                 rumps.MenuItem("Test All", callback=self.test_all),
             ]),
             None,
-            rumps.MenuItem("Preferences…", callback=self.open_preferences),
+            rumps.MenuItem("Preferences", callback=self.open_preferences),
             None,
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
@@ -331,7 +328,6 @@ class SusOpsApp(rumps.App):
 
     @staticmethod
     def _run_susops(command, show_alert=True):
-        print(f"Running command: {script} {command}")
         result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
                                 errors="ignore")
         if result.returncode != 0 and show_alert:
@@ -388,11 +384,11 @@ class SusOpsApp(rumps.App):
         output, _ = self._run_susops("ls")
         alert_foreground("SusOps Hosts", output)
 
-    def add_host(self, _):
-        host = rumps.Window("Enter hostname to add:", "SusOps: Add Host", dimensions=(220, 20)).run().text
+    def add_domain(self, _):
+        host = rumps.Window("Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules", "SusOps: Add Domain", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"add {host}")
-            rumps.notification("SusOps", "Add Host", output)
+            rumps.notification("SusOps", "Add Domain", output)
 
     def open_local_forward(self, _):
         if not self.local_panel:
@@ -426,11 +422,11 @@ class SusOpsApp(rumps.App):
         ])
         self.remote_panel.run()
 
-    def remove_host(self, _):
-        host = rumps.Window("Enter hostname to remove:", "SusOps: Remove Host", dimensions=(220, 20)).run().text
+    def remove_domain(self, _):
+        host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain", dimensions=(220, 20)).run().text
         if host:
             output, _ = self._run_susops(f"rm {host}")
-            rumps.notification("SusOps", "Remove Host", output)
+            rumps.notification("SusOps", "Remove Domain", output)
 
     def remove_local_forward(self, _):
         port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward", dimensions=(220, 20)).run().text

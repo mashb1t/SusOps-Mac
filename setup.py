@@ -4,7 +4,7 @@ import stat
 from setuptools import setup
 
 # ------------------- resource paths -------------------
-SCRIPT_SRC = os.path.join('susops', 'susops.sh')
+SCRIPT_SRC = os.path.join('susops-cli', 'susops.sh')
 LOGO_FILES = [os.path.join('images', f) for f in os.listdir('images') if os.path.isfile(os.path.join('images', f))]
 
 ICON_FILE = os.path.join('images', 'susops.icns')
@@ -15,7 +15,7 @@ os.chmod(SCRIPT_SRC, st.st_mode | stat.S_IEXEC)
 
 # ------------------- py2app lists -------------------
 DATA_FILES = [
-    ('susops', [SCRIPT_SRC]),
+    ('susops-cli', [SCRIPT_SRC]),
     ('images', LOGO_FILES + [ICON_FILE]),
 ]
 
