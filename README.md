@@ -6,17 +6,21 @@ and forwarding toolkit. **SusOps CLI** is already bundled, no need to manually d
 Built with [`rumps`](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add
 local / remote port-forwards, and tweak settings without touching a terminal.
 
+<img src="screenshots/menu.png" alt="Menu" height="400"/>
+
 ## Features
 
-| Menu action                         | CLI equivalent              | What it does                                             |
-|-------------------------------------|-----------------------------|----------------------------------------------------------|
-| **Start / Stop / Restart Proxy**    | `so start / stop / restart` | Launch or tear down SOCKS5+ PAC server via SSH.          |
-| **Add Host…**                       | `so add <domain>`           | Add a domain to the PAC file.                            |
-| **Add Local Forward…** (from → to)  | `so add -l REMOTE LOCAL`    | Expose a remote service on `localhost:<LOCAL>`.          |
-| **Add Remote Forward…** (from → to) | `so add -r LOCAL REMOTE`    | Publish a local port on `ssh_host:<REMOTE>`.             |
-| **Status…**                         | `so ps`                     | Show running state and active forwards.                  |
-| **Preferences…**                    | edit dot‑files              | GUI for SSH host & port defaults; optional auto‑restart. |
-| **Test Host / Test All**            | `so test …`                 | Quick connectivity test dialogs.                         |
+| Menu action                      | CLI equivalent                                              | What it does                                             |
+|----------------------------------|-------------------------------------------------------------|----------------------------------------------------------|
+| **Status**                       | `so ps`                                                     | Show running state and active forwards.                  |
+| **Settings…**                    | edit dot‑files                                              | GUI for SSH host & port defaults; optional auto‑restart. |
+| **Add Host…**                    | `so add <domain>`                                           | Add a domain to the PAC file.                            |
+| **Add Local Forward…**           | `so add -l REMOTE LOCAL`                                    | Expose a remote service on `localhost:<LOCAL>`.          |
+| **Add Remote Forward…**          | `so add -r LOCAL REMOTE`                                    | Publish a local port on `ssh_host:<REMOTE>`.             |
+| **Start / Stop / Restart Proxy** | `so start`<br/>`so stop`<br/>`so restart`                   | Launch or tear down SSH SOCKS5 Proxy and PAC server.     |
+| **Test Host / Test All**         | `so test …`                                                 | Quick connectivity test dialogs.                         |
+| **Launch Browser**               | `so firefox`<br/>`so chrome`<br/>`so chrome-proxy-settings` | Open a browser preconfigured with the PAC file.          |
+| **Reset All**                    | `so reset`                                                  | Remove all domains and port-forwards.                    |
 
 ## Requirements
 
@@ -69,10 +73,6 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 | Location     | Purpose                         |
 |--------------|---------------------------------|
 | `~/.susops/` | Same config files the CLI uses. |
-
-## Screenshots
-
-![Menu](screenshots/menu.png)
 
 ## Contributing
 
