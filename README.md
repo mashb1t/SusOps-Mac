@@ -55,7 +55,7 @@ brew upgrade --cask susops
 ### 2. Configure
 
 1. Launch the application
-2. Set up your SSH host and ports in the **Preferences** menu 
+2. Set up your SSH host and ports in the **Settings** menu 
 3. Start the proxy (menu bar icon should turn green)
 4. Add domains (requires browser [proxy settings reload](chrome://net-internals/#proxy)) or port-forwards (requires proxy restart)
 
@@ -98,7 +98,7 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 |----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **SusOps won't start**                             | You may need to allow its startup in **System Settings** > **Privacy & Security**                                                                                                        |
 | **SusOps starts, but doesn't show up in menu bar** | MacOS only displays so many menu bar apps. Ensure you don't have too many other items open.                                                                                              |
-| **Proxy doesn't start**                            | Check the **Preferences** menu for correct SSH host and port settings. Ensure you can reach the host directly using `ssh <host>`.                                                        |
+| **Proxy doesn't start**                            | Check the **Settings** menu for correct SSH host and port settings. Ensure you can reach the host directly using `ssh <host>`.                                                        |
 | **Chrome doesn't pick up my added domains**        | Make sure you completely close Chrome and open it again using the **Launch Browser** menu item. Then, open the Chrome Proxy settings and click **Re-apply settings**.                    |
 | **Firefox doesn't pick up my added domains**       | Make sure you completely close Firefox and open it again using the **Launch Browser** menu item.                                                                                         |
 | everything else                                    | see [Troubleshooting Guide SusOps CLI](https://github.com/mashb1t/SusOps-CLI?tab=readme-ov-file#troubleshooting) or [create an issue](https://github.com/mashb1t/SusOps-Mac/issues/new). |
