@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*'
 
-# Grant write permission for repository contents (needed for commit actions)
 permissions:
   contents: write
 
@@ -14,7 +13,6 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1) Checkout default branch at full history, so we can push
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
@@ -23,51 +21,33 @@ jobs:
           persist-credentials: true
           submodules: recursive
 
-      # 2) Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 3) Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4) Build SusOps.app with py2app
       - name: Build SusOps.app
         run: python setup.py py2app
 
-      # 5) Package .app into zip
       - name: Package .app into zip
         working-directory: ./dist
         run: zip -r SusOps.zip SusOps.app
 
-      # 6) Compute SHA256
-      - name: Compute SHA256
-        id: sha
-        run: echo "sum=$(shasum -a 256 dist/SusOps.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
-
-      # 7) Determine version (strip leading 'v')
-      - name: Determine version
-        id: vars
-        run: |
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      # 8) Create GitHub Release
       - name: Create Release
         id: release
         uses: actions/create-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           release_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 9) Upload SusOps.zip asset
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
@@ -78,16 +58,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 10) Update Cask file in-place
-      - name: Update Cask file
-        run: |
-          sed -i '' -E "s/version \".*\"/version \"${{ steps.vars.outputs.version }}\"/" Casks/susops.rb
-          sed -i '' -E "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.sum }}\"/" Casks/susops.rb
-
-      # 11) Commit and push Cask bump
-      - name: Commit Cask bump
-        uses: EndBug/add-and-commit@v9
-        with:
-          author_name: github-actions
-          author_email: actions@github.com
-          message: "brew: bump SusOps to ${{ steps.vars.outputs.version }}"
+  bump-brew:
+    name: Trigger Homebrew Tap Update
+    needs: build
+    uses: mashb1t/homebrew-susops/.github/workflows/update-brew.yml@main
+    with:
+      update_cli: false
+      update_mac: true
