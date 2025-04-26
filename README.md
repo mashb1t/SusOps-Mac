@@ -113,5 +113,5 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 
 ## License
 
-MIT © 2025 Manuel Schmid — see [LICENSE](https://github.com/mashb1t/SusOps-Mac/blob/main/LICENSE.txt).
+MIT © 2025 Manuel Schmid — see [LICENSE](LICENSE).
 [**SusOps CLI**](https://github.com/mashb1t/susops-cli) (submodule) retains its own [license](https://github.com/mashb1t/SusOps-CLI/blob/main/LICENSE.txt).
