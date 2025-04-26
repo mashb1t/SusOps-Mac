@@ -65,3 +65,5 @@ jobs:
     with:
       update_cli: false
       update_mac: true
+    secrets:
+      brew_tap_token: ${{ secrets.BREW_TAP_TOKEN }}
