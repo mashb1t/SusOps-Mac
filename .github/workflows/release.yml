@@ -65,6 +65,7 @@ jobs:
           brew bump-cask-pr \
             mashb1t/susops/susops \
             --version ${{ steps.version.outputs.version }} \
-            --no-browse --no-fork
+            --url "https://github.com/mashb1t/susops-mac/releases/download/v${{ steps.version.outputs.version }}/SusOps.zip"
+            --no-browse --no-fork --no-audit --no-style
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.BREW_PR_TOKEN }}
