@@ -59,7 +59,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   bump-brew:
-    name: bump brew cask version
+    name: brew
     needs: build
     uses: mashb1t/homebrew-susops/.github/workflows/update-brew.yml@main
     with:
