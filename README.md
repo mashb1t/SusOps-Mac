@@ -35,7 +35,7 @@ The app may be compatible with older versions of macOS, but it is not tested.
 ### 1. Install via Homebrew
 
 ```bash
-brew tap mashb1t/susops-mac
+brew tap mashb1t/susops
 brew install --cask susops
 ```
 
@@ -46,7 +46,7 @@ brew update
 brew upgrade --cask susops
 ```
 
-### OR Install manually
+### OR install manually
 
 1. Download the SusOps.zip file from the [latest release](https://github.com/mashb1t/susops-mac/releases)
 2. Unzip the file
