@@ -37,11 +37,6 @@ jobs:
         working-directory: ./dist
         run: zip -r SusOps.zip SusOps.app
 
-      - name: Calculate SHA256
-        id: sha
-        working-directory: ./dist
-        run: echo "sum=$(shasum -a 256 SusOps.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
-
       - name: Determine version
         id: version
         run: |
@@ -59,6 +54,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          SHA=$(curl -L "https://github.com/mashb1t/susops-mac/releases/download/${VERSION}/SusOps.zip" | shasum -a 256 | awk '{print $1}')
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
       - name: Configure Git actions user
         run: |
           git config --global user.name  "actions-user"
@@ -71,7 +73,7 @@ jobs:
             mashb1t/susops/susops \
             --version ${{ steps.version.outputs.version }} \
             --url "https://github.com/mashb1t/susops-mac/releases/download/v${{ steps.version.outputs.version }}/SusOps.zip" \
-            --sha256 "${{ steps.sha.outputs.sum }}" \
+            --sha256 "${{ steps.sha.outputs.sha }}" \
             --no-browse --no-fork --no-audit --no-style
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.BREW_PR_TOKEN }}
