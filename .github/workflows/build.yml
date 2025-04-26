@@ -3,7 +3,7 @@ name: Build & Release SusOps
 on:
   release:
     types:
-      - published
+      - released
 
 permissions:
   contents: write
