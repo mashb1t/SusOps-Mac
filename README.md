@@ -3,7 +3,7 @@
 A native-feeling **menu-bar app** for the [**SusOps CLI**](https://github.com/mashb1t/susops-cli) SSH–proxy
 and forwarding toolkit. **SusOps CLI** is already bundled, no need to manually download it (again).
 
-Built with [`rumps`](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add
+Built with [rumps](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add
 local / remote port-forwards, and tweak settings without touching a terminal.
 
 <img src="screenshots/menu.png" alt="Menu" height="400"/>
