@@ -3,9 +3,7 @@ import stat
 
 from setuptools import setup
 
-# ------------------- read version from file -------------------
-with open("version.txt", "r") as file:
-    VERSION = file.read().strip()
+from version import VERSION
 
 # ------------------- resource paths -------------------
 ICON_FILE = os.path.join("images", "iconset", "susops.icns")
@@ -21,7 +19,7 @@ DATA_FILES = [
     (os.path.join("images", "icons"), [os.path.join("images", "icons", f) for f in os.listdir(os.path.join("images", "icons")) if os.path.isfile(os.path.join("images", "icons", f))]),
     (os.path.join("images", "status"), [os.path.join("images", "status", f) for f in os.listdir(os.path.join("images", "status")) if os.path.isfile(os.path.join("images", "status", f))]),
     (os.path.join("images", "iconset"), [ICON_FILE]),
-    "version.txt"
+    "version.py"
 ]
 
 OPTIONS = {

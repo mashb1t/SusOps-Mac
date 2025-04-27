@@ -15,12 +15,13 @@ from AppKit import (
 from Cocoa import (
     NSPanel, NSTextField, NSMakeRect,
     NSButton, NSApplication, NSDistributedNotificationCenter,
-    NSImageView, NSImage, NSTitledWindowMask, NSClosableWindowMask, NSFont, NSAttributedString, NSHTMLTextDocumentType,
+    NSImageView, NSImage, NSFont, NSAttributedString, NSHTMLTextDocumentType,
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
     NSForegroundColorAttributeName, NSColor
 )
-
 from Foundation import NSBundle, NSData, NSDictionary
+
+from version import VERSION
 
 
 class Appearance(Enum):
@@ -53,8 +54,6 @@ def resource_path(rel_path):
 
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
-with open(resource_path("version.txt"), "r") as file:
-    VERSION = file.read().strip()
 
 class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
@@ -347,7 +346,6 @@ class SusOpsApp(rumps.App):
     def launch_firefox(self, _):
         output, _ = self._run_susops("firefox", False)
 
-
     def reset(self, _):
         result = alert_foreground(
             "Reset Everything?",
@@ -543,8 +541,9 @@ class TwoFieldPanel(NSPanel):
 
 class AboutPanel(NSPanel):
     """A simple About dialog with icon, labels, and copyright."""
+
     def initWithContentRect_styleMask_backing_defer_(
-        self, frame, style, backing, defer
+            self, frame, style, backing, defer
     ):
         # call designated initializer
         self = objc.super(AboutPanel, self).initWithContentRect_styleMask_backing_defer_(
@@ -587,7 +586,7 @@ class AboutPanel(NSPanel):
         name_field.setFont_(NSFont.boldSystemFontOfSize_(14))
         content.addSubview_(name_field)
 
-        # Version
+        # Versions
         ver_y = name_y - 20
         version_field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, ver_y, win_w, 14))
         version_field.setStringValue_(f"Version {VERSION}")
