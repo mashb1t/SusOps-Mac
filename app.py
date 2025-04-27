@@ -14,8 +14,13 @@ from AppKit import (
 )
 from Cocoa import (
     NSPanel, NSTextField, NSMakeRect,
-    NSButton, NSApplication, NSDistributedNotificationCenter
+    NSButton, NSApplication, NSDistributedNotificationCenter,
+    NSImageView, NSImage, NSTitledWindowMask, NSClosableWindowMask, NSFont, NSAttributedString, NSHTMLTextDocumentType,
+    NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
+    NSForegroundColorAttributeName, NSColor
 )
+
+from Foundation import NSBundle, NSData, NSDictionary
 
 
 class Appearance(Enum):
@@ -77,6 +82,7 @@ class SusOpsApp(rumps.App):
         self.settings_panel = None
         self.local_panel = None
         self.remote_panel = None
+        self.about_panel = None
 
         self.menu = [
             rumps.MenuItem("Status", callback=self.check_status),
@@ -115,6 +121,7 @@ class SusOpsApp(rumps.App):
             None,
             rumps.MenuItem("Reset All", callback=self.reset),
             None,
+            rumps.MenuItem("About", callback=self.open_about),
             rumps.MenuItem("Quit SusOps", callback=self.quit_app, key="q")
         ]
 
@@ -349,6 +356,16 @@ class SusOpsApp(rumps.App):
         if result == 1:
             self._run_susops("reset --force", False)
 
+    def open_about(self, _):
+        if not hasattr(self, 'about_panel') or self.about_panel is None:
+            frame = NSMakeRect(0, 0, 280, 190)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+            self.about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self.about_panel.parent_app = self
+        self.about_panel.run()
+
     def quit_app(self, _):
         self._run_susops("stop --keep-ports", False)
         rumps.quit_application()
@@ -439,7 +456,7 @@ class SettingsPanel(NSPanel):
         self.close()
         restart = alert_foreground(
             "Settings Saved",
-            "Settings will be applied on next start.\n\nRestart now?",
+            "Settings will be applied on next proxy service start.\n\nRestart proxy service now?",
             ok="Yes", cancel="No"
         )
 
@@ -520,6 +537,131 @@ class TwoFieldPanel(NSPanel):
 
     def cancel_(self, sender):
         self.close()
+
+
+class AboutPanel(NSPanel):
+    """A simple About dialog with icon, labels, and copyright."""
+    def initWithContentRect_styleMask_backing_defer_(
+        self, frame, style, backing, defer
+    ):
+        # call designated initializer
+        self = objc.super(AboutPanel, self).initWithContentRect_styleMask_backing_defer_(
+            frame, style, backing, defer
+        )
+        if not self:
+            return None
+
+        # window styling
+        self.setTitle_("")
+        self.setLevel_(NSFloatingWindowLevel)
+        content = self.contentView()
+
+        # dimensions
+        win_w = frame.size.width
+        win_h = frame.size.height
+        icon_size = 64
+
+        # load icon from bundle resources
+        bundle = NSBundle.mainBundle()
+        res_path = bundle.resourcePath()
+        img_path = f"images/icons/logo_dark_stopped_partially.svg"
+        # icon view centered at top
+        x_icon = (win_w - icon_size) / 2
+        y_icon = win_h - icon_size - 10
+        icon_frame = NSMakeRect(x_icon, y_icon, icon_size, icon_size)
+        image_view = NSImageView.alloc().initWithFrame_(icon_frame)
+        img = NSImage.alloc().initByReferencingFile_(img_path)
+        image_view.setImage_(img)
+        content.addSubview_(image_view)
+
+        # App name
+        name_y = y_icon - 25
+        name_field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, name_y, win_w, 18))
+        name_field.setStringValue_("SusOps")
+        name_field.setAlignment_(1)
+        name_field.setBezeled_(False)
+        name_field.setDrawsBackground_(False)
+        name_field.setEditable_(False)
+        name_field.setFont_(NSFont.boldSystemFontOfSize_(14))
+        content.addSubview_(name_field)
+
+        # Version
+        ver_y = name_y - 20
+        version_field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, ver_y, win_w, 14))
+        version_field.setStringValue_("Version 1.0.2")
+        version_field.setAlignment_(1)
+        version_field.setBezeled_(False)
+        version_field.setDrawsBackground_(False)
+        version_field.setEditable_(False)
+        version_field.setFont_(NSFont.systemFontOfSize_(11))
+        content.addSubview_(version_field)
+
+        # Links (HTML attributed string)
+        link_y = ver_y - 27
+        link_text = (
+            "<a href='https://github.com/mashb1t/susops-mac' style='text-decoration: none;'>GitHub</a> | "
+            "<a href='https://github.com/mashb1t/susops-cli' style='text-decoration: none;'>CLI</a> | "
+            "<a href='https://github.com/sponsors/mashb1t' style='text-decoration: none;'>Sponsor</a>"
+        )
+        # convert HTML to attributed string
+        html_bytes = link_text.encode('utf-8')
+        data = NSData.alloc().initWithBytes_length_(html_bytes, len(html_bytes))
+        opts = NSDictionary.dictionaryWithObject_forKey_(NSHTMLTextDocumentType, 'DocumentType')
+        attr_str, _, _ = NSAttributedString.alloc() \
+            .initWithData_options_documentAttributes_error_(
+            data, opts, None, None
+        )
+        # adjust font size & center-align
+        mutable = attr_str.mutableCopy()
+        length = mutable.length()
+        mutable.addAttribute_value_range_(
+            NSFontAttributeName,
+            NSFont.systemFontOfSize_(12),
+            (0, length)
+        )
+        para = NSMutableParagraphStyle.alloc().init()
+        para.setAlignment_(NSTextAlignmentCenter)
+        mutable.addAttribute_value_range_(
+            NSParagraphStyleAttributeName,
+            para,
+            (0, length)
+        )
+
+        label_color = NSColor.labelColor()
+        # apply it across the entire string
+        mutable.addAttribute_value_range_(
+            NSForegroundColorAttributeName,
+            label_color,
+            (0, mutable.length())
+        )
+
+        links = NSTextField.alloc().initWithFrame_(NSMakeRect(0, link_y, win_w, 16))
+        links.setAllowsEditingTextAttributes_(True)
+        links.setSelectable_(True)
+        links.setAlignment_(1)
+        links.setBezeled_(False)
+        links.setDrawsBackground_(False)
+        links.setEditable_(False)
+        links.setAttributedStringValue_(mutable)
+        content.addSubview_(links)
+
+        # Copyright
+        copy_y = link_y - 25
+        copyright = NSTextField.alloc().initWithFrame_(NSMakeRect(0, copy_y, win_w, 16))
+        copyright.setStringValue_("Copyright © Manuel Schmid")
+        copyright.setAlignment_(1)
+        copyright.setBezeled_(False)
+        copyright.setDrawsBackground_(False)
+        copyright.setEditable_(False)
+        copyright.setFont_(NSFont.systemFontOfSize_(11))
+        content.addSubview_(copyright)
+
+        return self
+
+    def run(self):
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        self.center()
+        self.makeKeyAndOrderFront_(None)
 
 
 class LocalForwardPanel(TwoFieldPanel):
