@@ -450,6 +450,7 @@ class SettingsPanel(NSPanel):
         self.close()
 
     def run(self):
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         self.center()
         self.makeKeyAndOrderFront_(None)
 
@@ -513,6 +514,7 @@ class TwoFieldPanel(NSPanel):
             y -= 40
 
     def run(self):
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         self.center()
         self.makeKeyAndOrderFront_(None)
 
