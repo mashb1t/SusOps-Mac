@@ -53,6 +53,8 @@ def resource_path(rel_path):
 
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
+with open(resource_path("version.txt"), "r") as file:
+    VERSION = file.read().strip()
 
 class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
@@ -588,7 +590,7 @@ class AboutPanel(NSPanel):
         # Version
         ver_y = name_y - 20
         version_field = NSTextField.alloc().initWithFrame_(NSMakeRect(0, ver_y, win_w, 14))
-        version_field.setStringValue_("Version 1.0.2")
+        version_field.setStringValue_(f"Version {VERSION}")
         version_field.setAlignment_(1)
         version_field.setBezeled_(False)
         version_field.setDrawsBackground_(False)
