@@ -80,10 +80,10 @@ class SusOpsApp(rumps.App):
         # Set initial icon based on current appearance
         self.update_icon()
 
-        self.settings_panel = None
-        self.local_panel = None
-        self.remote_panel = None
-        self.about_panel = None
+        self._settings_panel = None
+        self._local_panel = None
+        self._remote_panel = None
+        self._about_panel = None
 
         self.menu = [
             rumps.MenuItem("Status", callback=self.check_status),
@@ -132,7 +132,7 @@ class SusOpsApp(rumps.App):
     def timer_check_state(self, _=None):
         # runs every 5s
         try:
-            output, returncode = self._run_susops("ps", False)
+            output, returncode = self.run_susops("ps", False)
         except subprocess.CalledProcessError:
             output, returncode = "Error running command", -1
 
@@ -185,7 +185,7 @@ class SusOpsApp(rumps.App):
         self.icon = path
 
     @staticmethod
-    def _run_susops(command, show_alert=True):
+    def run_susops(command, show_alert=True):
         result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
                                 errors="ignore")
         if result.returncode != 0 and show_alert:
@@ -208,86 +208,86 @@ class SusOpsApp(rumps.App):
 
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-        if self.settings_panel is None:
+        if self._settings_panel is None:
             frame = NSMakeRect(0, 0, 310, 190)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
                     | NSWindowStyleMaskResizable
             )
-            self.settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self.settings_panel.parent_app = self
+            self._settings_panel.parent_app = self
         prefs = self.load_config()
-        self.settings_panel.ssh_field.setStringValue_(prefs['ssh_host'])
-        self.settings_panel.socks_field.setStringValue_(prefs['socks_port'])
-        self.settings_panel.pac_field.setStringValue_(prefs['pac_port'])
-        self.settings_panel.run()
+        self._settings_panel.ssh_field.setStringValue_(prefs['ssh_host'])
+        self._settings_panel.socks_field.setStringValue_(prefs['socks_port'])
+        self._settings_panel.pac_field.setStringValue_(prefs['pac_port'])
+        self._settings_panel.run()
 
     def add_domain(self, _):
         host = rumps.Window(
             "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules",
             "SusOps: Add Domain", ok="Add", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
-            output, _ = self._run_susops(f"add {host}")
+            output, _ = self.run_susops(f"add {host}")
             rumps.notification("SusOps", "Add Domain", output)
 
     def add_local_forward(self, _):
-        if not self.local_panel:
+        if not self._local_panel:
             frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
-            self.local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self.local_panel.setTitle_("Add Local Forward")
-            self.local_panel.parent_app = self
+            self._local_panel.setTitle_("Add Local Forward")
+            self._local_panel.parent_app = self
 
-        self.local_panel.configure_fields([
+        self._local_panel.configure_fields([
             ('remote_port_field', 'Forward Remote Port:'),
             ('local_port_field', 'To Local Port:'),
         ])
-        self.local_panel.run()
+        self._local_panel.run()
 
     def add_remote_forward(self, _):
-        if not self.remote_panel:
+        if not self._remote_panel:
             frame = NSMakeRect(0, 0, 340, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
-            self.remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self.remote_panel.setTitle_("Add Remote Forward")
-            self.remote_panel.parent_app = self
+            self._remote_panel.setTitle_("Add Remote Forward")
+            self._remote_panel.parent_app = self
 
-        self.remote_panel.configure_fields([
+        self._remote_panel.configure_fields([
             ('local_port_field', 'Forward Local Port:'),
             ('remote_port_field', 'To Remote Port:'),
         ])
-        self.remote_panel.run()
+        self._remote_panel.run()
 
     def remove_domain(self, _):
         host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain",
                             ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
-            output, _ = self._run_susops(f"rm {host}")
+            output, _ = self.run_susops(f"rm {host}")
             rumps.notification("SusOps", "Remove Domain", output)
 
     def remove_local_forward(self, _):
         port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward",
                             ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if port:
-            output, _ = self._run_susops(f"rm -l {port}")
+            output, _ = self.run_susops(f"rm -l {port}")
             rumps.notification("SusOps", "Remove Local Forward", output)
 
     def remove_remote_forward(self, _):
         port = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward",
                             ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
         if port:
-            output, _ = self._run_susops(f"rm -r {port}")
+            output, _ = self.run_susops(f"rm -r {port}")
             rumps.notification("SusOps", "Remove Remote Forward", output)
 
     def list_hosts(self, _):
-        output, _ = self._run_susops("ls")
+        output, _ = self.run_susops("ls")
         alert_foreground("SusOps Hosts", output)
 
     def start_proxy(self, _):
@@ -313,38 +313,38 @@ class SusOpsApp(rumps.App):
             alert_foreground("Error starting proxy", str(e))
 
     def stop_proxy(self, _):
-        output, _ = self._run_susops("stop --keep-ports")
+        output, _ = self.run_susops("stop --keep-ports")
         self.timer_check_state()
 
     def restart_proxy(self, _):
         p = self.load_config()
         cmd = f"restart {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
-        output, _ = self._run_susops(cmd)
+        output, _ = self.run_susops(cmd)
         self.timer_check_state()
 
     def check_status(self, _):
-        output, _ = self._run_susops("ps", False)
+        output, _ = self.run_susops("ps", False)
         alert_foreground("SusOps Status", output)
 
     def test_any(self, _):
         host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any",
                             ok="Test", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
-            output, _ = self._run_susops(f"test {host}", False)
+            output, _ = self.run_susops(f"test {host}", False)
             alert_foreground("SusOps Test", output)
 
     def test_all(self, _):
-        output, _ = self._run_susops("test --all", False)
+        output, _ = self.run_susops("test --all", False)
         alert_foreground("SusOps Test All", output)
 
     def launch_chrome(self, _):
-        output, _ = self._run_susops("chrome", False)
+        output, _ = self.run_susops("chrome", False)
 
     def launch_chrome_proxy_settings(self, _):
-        output, _ = self._run_susops("chrome-proxy-settings", False)
+        output, _ = self.run_susops("chrome-proxy-settings", False)
 
     def launch_firefox(self, _):
-        output, _ = self._run_susops("firefox", False)
+        output, _ = self.run_susops("firefox", False)
 
     def reset(self, _):
         result = alert_foreground(
@@ -354,20 +354,20 @@ class SusOpsApp(rumps.App):
         )
 
         if result == 1:
-            self._run_susops("reset --force", False)
+            self.run_susops("reset --force", False)
 
     def open_about(self, _):
-        if not hasattr(self, 'about_panel') or self.about_panel is None:
+        if not self._about_panel is None:
             frame = NSMakeRect(0, 0, 280, 190)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-            self.about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self.about_panel.parent_app = self
-        self.about_panel.run()
+            self._about_panel.parent_app = self
+        self._about_panel.run()
 
     def quit_app(self, _):
-        self._run_susops("stop --keep-ports", False)
+        self.run_susops("stop --keep-ports", False)
         rumps.quit_application()
 
 
