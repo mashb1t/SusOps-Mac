@@ -200,9 +200,11 @@ class SusOpsApp(rumps.App):
                 self.menu["Test"]["Test Any"].set_callback(None)
                 self.menu["Test"]["Test All"].set_callback(None)
 
-    def appearanceChanged_(self, note):
+    def appearanceChanged_(self, _):
         # Called when user switches between light/dark mode
         self.update_icon()
+        if self._settings_panel:
+            self._settings_panel.update_appearance()
 
     def update_icon(self, logo_style: LogoStyle = None):
         logo_style = logo_style or LogoStyle[self.config['logo_style'].upper()]
@@ -250,11 +252,6 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
         self.config = self.load_config()
-        for idx, style in enumerate(LogoStyle):
-            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
-            icon.setSize_((24, 24))
-            self._settings_panel.segmented_icons.setImage_forSegment_(icon, idx)
-            self._settings_panel.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
         self._settings_panel.ssh_field.setStringValue_(self.config['ssh_host'])
         self._settings_panel.socks_field.setStringValue_(self.config['socks_port'])
         self._settings_panel.pac_field.setStringValue_(self.config['pac_port'])
@@ -522,8 +519,9 @@ class SettingsPanel(NSPanel):
         self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
         self.segmented_icons.setSegmentCount_(len(LogoStyle))
         self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
-
         self.segmented_icons.setControlSize_(NSRegularControlSize)
+
+        self.update_appearance()
 
         self.segmented_icons.setTarget_(self)
         self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
@@ -585,6 +583,14 @@ class SettingsPanel(NSPanel):
         content.addSubview_(save_btn)
 
         return self
+
+    def update_appearance(self):
+        # add / update logo segmented control
+        for idx, style in enumerate(LogoStyle):
+            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
+            icon.setSize_((24, 24))
+            self.segmented_icons.setImage_forSegment_(icon, idx)
+            self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
 
     def saveSettings_(self, sender):
         self.toggleLaunchAtLogin_(self.launch_checkbox)
