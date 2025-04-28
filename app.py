@@ -669,9 +669,9 @@ class LocalForwardPanel(TwoFieldPanel):
     def add_(self, sender):
         if (self.local_port_field.stringValue().isdigit() and
                 self.remote_port_field.stringValue().isdigit()):
-            cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
-            out, _ = self.parent_app._run_susops(cmd)
-            rumps.notification("SusOps", "Remote Forward Added", out)
+            cmd = f"add -l {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
+            out, _ = self.parent_app.run_susops(cmd)
+            rumps.notification("SusOps", "Local Forward Added", out)
         self.close()
 
 
@@ -680,8 +680,8 @@ class RemoteForwardPanel(TwoFieldPanel):
         if (self.remote_port_field.stringValue().isdigit() and
                 self.local_port_field.stringValue().isdigit()):
             cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
-            out, _ = self.parent_app._run_susops(cmd)
-            rumps.notification("SusOps", "Local Forward Added", out)
+            out, _ = self.parent_app.run_susops(cmd)
+            rumps.notification("SusOps", "Remote Forward Added", out)
         self.close()
 
 
