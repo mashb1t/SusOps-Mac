@@ -519,7 +519,7 @@ class SettingsPanel(NSPanel):
                 f.write(val)
 
         self.close()
-        self.parent_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy service start.")
+        self.parent_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
 
     def cancelSettings_(self, sender):
         self.close()
