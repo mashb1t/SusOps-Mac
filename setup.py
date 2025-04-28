@@ -16,7 +16,8 @@ os.chmod(SCRIPT_SRC, st.st_mode | stat.S_IEXEC)
 # ------------------- py2app lists -------------------
 DATA_FILES = [
     ("susops-cli", [SCRIPT_SRC]),
-    (os.path.join("images", "icons"), [os.path.join("images", "icons", f) for f in os.listdir(os.path.join("images", "icons")) if os.path.isfile(os.path.join("images", "icons", f))]),
+    *[(root, [os.path.join(root, f) for f in files])
+      for root, dirs, files in os.walk(os.path.join("images", "icons"))],
     (os.path.join("images", "status"), [os.path.join("images", "status", f) for f in os.listdir(os.path.join("images", "status")) if os.path.isfile(os.path.join("images", "status", f))]),
     (os.path.join("images", "iconset"), [ICON_FILE]),
     "version.py"

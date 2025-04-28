@@ -17,7 +17,8 @@ from Cocoa import (
     NSButton, NSApplication, NSDistributedNotificationCenter,
     NSImageView, NSImage, NSFont, NSAttributedString, NSHTMLTextDocumentType,
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
-    NSForegroundColorAttributeName, NSColor
+    NSForegroundColorAttributeName, NSColor, NSRadioButton, NSOnState, NSOffState,
+    NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown
 )
 from Foundation import NSBundle, NSData, NSDictionary
 
@@ -25,16 +26,38 @@ from version import VERSION
 
 
 class Appearance(Enum):
-    LIGHT = "light"
-    DARK = "dark"
+    LIGHT = "LIGHT"
+    DARK = "DARK"
 
 
 class ProcessState(Enum):
-    INITIAL = "initial"
-    RUNNING = "running"
-    STOPPED_PARTIALLY = "stopped_partially"
-    STOPPED = "stopped"
-    ERROR = "error"
+    INITIAL = "INITIAL"
+    RUNNING = "RUNNING"
+    STOPPED_PARTIALLY = "STOPPED_PARTIALLY"
+    STOPPED = "STOPPED"
+    ERROR = "ERROR"
+
+
+class LogoStyle(Enum):
+    COG = "COG"
+    COLORED_GLASSES = "COLORED_GLASSES"
+    COLORED_S = "COLORED_S"
+
+
+DEFAULT_LOGO_STYLE = LogoStyle.COLORED_GLASSES
+
+
+def get_appearance() -> Appearance:
+    app = NSApplication.sharedApplication()
+    appearance = app.effectiveAppearance().name()
+    return Appearance.DARK if Appearance.DARK.value.lower() in appearance.lower() else Appearance.LIGHT
+
+
+def get_logo_style_image(style: LogoStyle, state: ProcessState = ProcessState.STOPPED_PARTIALLY, appearance: Appearance = None) -> str:
+    appearance = appearance or get_appearance()
+    appearance = Appearance.LIGHT if appearance == Appearance.DARK else Appearance.DARK
+    filetype = "svg" if style == LogoStyle.COG else "png"
+    return os.path.join("images", "icons", style.value.lower(), appearance.value.lower(), f"{state.value.lower()}.{filetype}")
 
 
 def alert_foreground(title, message, ok=None, cancel=None, other=None, icon_path=None) -> int:
@@ -55,8 +78,14 @@ def resource_path(rel_path):
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
+# Global instance of the app
+susops_app = None  # type: SusOpsApp|None
+
+
 class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
+        global susops_app
+        susops_app = self
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.images_dir = icon_dir or os.path.join(self.base_dir, 'images')
         self.process_state = ProcessState.INITIAL
@@ -78,6 +107,7 @@ class SusOpsApp(rumps.App):
         )
 
         # Set initial icon based on current appearance
+        self.config = self.load_config()
         self.update_icon()
 
         self._settings_panel = None
@@ -152,8 +182,8 @@ class SusOpsApp(rumps.App):
         self.process_state = new_state
         self.update_icon()
 
-        self.menu["Status"].title = f"SusOps is {self.process_state.value.replace("_", " ")}"
-        self.menu["Status"].icon = os.path.join(self.images_dir, "status", self.process_state.value + ".svg")
+        self.menu["Status"].title = f"SusOps is {self.process_state.value.lower().replace("_", " ")}"
+        self.menu["Status"].icon = os.path.join(self.images_dir, "status", self.process_state.value.lower() + ".svg")
 
         match self.process_state:
             case ProcessState.RUNNING:
@@ -173,16 +203,10 @@ class SusOpsApp(rumps.App):
         # Called when user switches between light/dark mode
         self.update_icon()
 
-    def update_icon(self):
-        state_value = "stopped" if self.process_state.value == "initial" else self.process_state.value
-
-        # choose file based on state and appearance
-        app = NSApplication.sharedApplication()
-        appearance = app.effectiveAppearance().name()
-        theme = 'light' if 'Dark' in appearance else 'dark'
-        fname = f"logo_{theme}_{state_value}.svg"
-        path = os.path.join(self.images_dir, "icons", fname)
-        self.icon = path
+    def update_icon(self, logo_style: LogoStyle = None):
+        logo_style = logo_style or LogoStyle[self.config['logo_style'].upper()]
+        state = ProcessState.STOPPED if self.process_state == ProcessState.INITIAL else self.process_state
+        self.icon = get_logo_style_image(logo_style, state)
 
     @staticmethod
     def run_susops(command, show_alert=True):
@@ -195,7 +219,7 @@ class SusOpsApp(rumps.App):
     @staticmethod
     def load_config():
         ws = os.path.expanduser("~/.susops")
-        defaults = {"ssh_host": "", "socks_port": "1080", "pac_port": "1081"}
+        defaults = {"ssh_host": "", "socks_port": "1080", "pac_port": "1081", "logo_style": DEFAULT_LOGO_STYLE.value}
         configs = {}
         for name in defaults:
             path = os.path.join(ws, name)
@@ -204,12 +228,18 @@ class SusOpsApp(rumps.App):
                     configs[name] = f.read().strip()
             except IOError:
                 configs[name] = defaults[name]
+
+        # check if logo_style is valid
+        if configs['logo_style'] not in LogoStyle.__members__:
+            configs['logo_style'] = DEFAULT_LOGO_STYLE.value
+            with open(os.path.join(ws, "logo_style"), "w") as f:
+                f.write(configs['logo_style'])
         return configs
 
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 190)
+            frame = NSMakeRect(0, 0, 310, 230)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -218,11 +248,15 @@ class SusOpsApp(rumps.App):
             self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._settings_panel.parent_app = self
-        prefs = self.load_config()
-        self._settings_panel.ssh_field.setStringValue_(prefs['ssh_host'])
-        self._settings_panel.socks_field.setStringValue_(prefs['socks_port'])
-        self._settings_panel.pac_field.setStringValue_(prefs['pac_port'])
+        config = self.load_config()
+        self._settings_panel.ssh_field.setStringValue_(config['ssh_host'])
+        self._settings_panel.socks_field.setStringValue_(config['socks_port'])
+        self._settings_panel.pac_field.setStringValue_(config['pac_port'])
+
+        # get index of current logo style
+        logo_style = config['logo_style']
+        selected_index = list(LogoStyle).index(LogoStyle[logo_style.upper()])
+        self._settings_panel.segmented_icons.setSelectedSegment_(selected_index)
         self._settings_panel.run()
 
     def show_restart_dialog(self, title, message):
@@ -267,7 +301,6 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
             self._local_panel.setTitle_("Add Local Forward")
-            self._local_panel.parent_app = self
 
         self._local_panel.configure_fields([
             ('remote_port_field', 'Make Remote Port:'),
@@ -283,8 +316,6 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
             self._remote_panel.setTitle_("Add Remote Forward")
-            self._remote_panel.parent_app = self
-
         self._remote_panel.configure_fields([
             ('local_port_field', 'Make Local Port:'),
             ('remote_port_field', 'Available on Remote Port:'),
@@ -382,8 +413,8 @@ class SusOpsApp(rumps.App):
         self.timer_check_state()
 
     def restart_proxy(self, _):
-        p = self.load_config()
-        cmd = f"restart {p['ssh_host']} {p['socks_port']} {p['pac_port']}"
+        config = self.load_config()
+        cmd = f"restart {config['ssh_host']} {config['socks_port']} {config['pac_port']}"
         output, _ = self.run_susops(cmd)
         self.timer_check_state()
 
@@ -428,7 +459,6 @@ class SusOpsApp(rumps.App):
             self._about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._about_panel.parent_app = self
         self._about_panel.run()
 
     def quit_app(self, _):
@@ -450,51 +480,84 @@ class SettingsPanel(NSPanel):
 
         self.setTitle_("Settings")
         self.setLevel_(NSFloatingWindowLevel)
-
         content = self.contentView()
+        win_h = frame.size.height - 30
 
         # --- SSH Host ---
-        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 140, 100, 24))
+        y = win_h - 20
+        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
         self.ssh_label.setStringValue_("SSH Host:")
+        self.ssh_label.setAlignment_(2)
         self.ssh_label.setBezeled_(False)
         self.ssh_label.setDrawsBackground_(False)
         self.ssh_label.setEditable_(False)
         content.addSubview_(self.ssh_label)
 
-        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 140, 160, 24))
+        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
         content.addSubview_(self.ssh_field)
 
         # --- SOCKS Port ---
-        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 100, 100, 24))
+        y -= 40
+        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
         self.socks_label.setStringValue_("SOCKS Port:")
+        self.socks_label.setAlignment_(2)
         self.socks_label.setBezeled_(False)
         self.socks_label.setDrawsBackground_(False)
         self.socks_label.setEditable_(False)
         content.addSubview_(self.socks_label)
 
-        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 100, 160, 24))
+        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
         content.addSubview_(self.socks_field)
 
         # --- PAC Port ---
-        self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 60, 100, 24))
+        y -= 40
+        self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
         self.pac_label.setStringValue_("PAC Port:")
+        self.pac_label.setAlignment_(2)
         self.pac_label.setBezeled_(False)
         self.pac_label.setDrawsBackground_(False)
         self.pac_label.setEditable_(False)
         content.addSubview_(self.pac_label)
 
-        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, 60, 160, 24))
+        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
         content.addSubview_(self.pac_field)
 
+        # --- Logo Style ---
+        y -= 40
+        self.logo_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.logo_label.setStringValue_("Logo Style:")
+        self.logo_label.setAlignment_(2)
+        self.logo_label.setBezeled_(False)
+        self.logo_label.setDrawsBackground_(False)
+        self.logo_label.setEditable_(False)
+        content.addSubview_(self.logo_label)
+
+        self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.segmented_icons.setSegmentCount_(len(LogoStyle))
+        self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
+
+        self.segmented_icons.setControlSize_(NSRegularControlSize)
+
+        for idx, style in enumerate(LogoStyle):
+            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
+            icon.setSize_((24, 24))
+            self.segmented_icons.setImage_forSegment_(icon, idx)
+            self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
+
+        self.segmented_icons.setTarget_(self)
+        self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
+        content.addSubview_(self.segmented_icons)
+
         # --- Save/Cancel Buttons ---
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, 18, 80, 30))
+        y -= 40
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, y, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancelSettings:")
         content.addSubview_(cancel_btn)
 
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, 18, 80, 30))
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, y, 80, 30))
         save_btn.setTitle_("Save")
         save_btn.setBezelStyle_(1)
         save_btn.setTarget_(self)
@@ -518,10 +581,24 @@ class SettingsPanel(NSPanel):
             with open(os.path.join(ws, name), "w") as f:
                 f.write(val)
 
+        selected_index = self.segmented_icons.selectedSegment()
+        selected_style = list(LogoStyle)[selected_index]
+        with open(os.path.join(ws, "logo_style"), "w") as f:
+            f.write(selected_style.value)
+
+        susops_app.config = susops_app.load_config()
+        susops_app.update_icon(selected_style)
+
         self.close()
-        self.parent_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
+        susops_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
+
+    def segmentedIconsChange_(self, sender):
+        selected_index = sender.selectedSegment()
+        selected_style = list(LogoStyle)[selected_index]
+        susops_app.update_icon(selected_style)
 
     def cancelSettings_(self, sender):
+        susops_app.update_icon()
         self.close()
 
     def run(self):
@@ -740,9 +817,10 @@ class LocalForwardPanel(TwoFieldPanel):
             return
 
         cmd = f"add -l {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
-        output, returncode = self.parent_app.run_susops(cmd)
+        output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
-            self.parent_app.show_restart_dialog("Success", output)
+            susops_app.show_restart_dialog("Success", output)
+            self.close()
 
 
 class RemoteForwardPanel(TwoFieldPanel):
@@ -754,9 +832,10 @@ class RemoteForwardPanel(TwoFieldPanel):
             return
 
         cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
-        output, returncode = self.parent_app.run_susops(cmd)
+        output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
-            self.parent_app.show_restart_dialog("Success", output)
+            susops_app.show_restart_dialog("Success", output)
+            self.close()
 
 
 if __name__ == "__main__":
