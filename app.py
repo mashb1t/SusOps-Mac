@@ -595,7 +595,7 @@ class SettingsPanel(NSPanel):
             self.segmented_icons.setImage_forSegment_(icon, idx)
             self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
 
-    def saveSettings_(self, sender):
+    def saveSettings_(self, _):
         self.toggleLaunchAtLogin_(self.launch_checkbox)
 
         ws = os.path.expanduser("~/.susops")
@@ -651,7 +651,7 @@ class SettingsPanel(NSPanel):
 
         subprocess.call(["osascript", "-e", applescript])
 
-    def cancelSettings_(self, sender):
+    def cancelSettings_(self, _):
         # reset the logo style to the saved one
         susops_app.config = susops_app.load_config()
         susops_app.update_icon()
@@ -734,7 +734,7 @@ class TwoFieldPanel(NSPanel):
         self.center()
         self.makeKeyAndOrderFront_(None)
 
-    def cancel_(self, sender):
+    def cancel_(self, _):
         self.close()
 
 
@@ -864,7 +864,7 @@ class AboutPanel(NSPanel):
 
 
 class LocalForwardPanel(TwoFieldPanel):
-    def add_(self, sender):
+    def add_(self, _):
         if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
             return
 
@@ -879,7 +879,7 @@ class LocalForwardPanel(TwoFieldPanel):
 
 
 class RemoteForwardPanel(TwoFieldPanel):
-    def add_(self, sender):
+    def add_(self, _):
         if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
             return
 
