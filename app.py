@@ -167,6 +167,9 @@ class SusOpsApp(rumps.App):
         except subprocess.CalledProcessError:
             output, returncode = "Error running command", -1
 
+        if not output:
+            returncode = -1
+
         match returncode:
             case 0:
                 new_state = ProcessState.RUNNING
