@@ -475,11 +475,6 @@ class SusOpsApp(rumps.App):
             self._about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-
-        # Set the image based on the current logo style
-        img_path = get_logo_style_image(LogoStyle[self.config['logo_style'].upper()], ProcessState.STOPPED_PARTIALLY)
-        img = NSImage.alloc().initByReferencingFile_(img_path)
-        self._about_panel.image_view.setImage_(img)
         self._about_panel.run()
 
     def quit_app(self, _):
@@ -757,6 +752,11 @@ class AboutPanel(NSPanel):
         y_icon = win_h - icon_size - 10
         icon_frame = NSMakeRect(x_icon, y_icon, icon_size, icon_size)
         self.image_view = NSImageView.alloc().initWithFrame_(icon_frame)
+
+        img_path = get_logo_style_image(LogoStyle.COG, ProcessState.STOPPED_PARTIALLY, Appearance.LIGHT)
+        img = NSImage.alloc().initByReferencingFile_(img_path)
+        self.image_view.setImage_(img)
+
         content.addSubview_(self.image_view)
 
         # App name
