@@ -617,7 +617,7 @@ class SettingsPanel(NSPanel):
             f.write(selected_style.value)
 
         susops_app.config = susops_app.load_config()
-        susops_app.update_icon(selected_style)
+        susops_app.update_icon()
 
         self.close()
         susops_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
@@ -625,6 +625,9 @@ class SettingsPanel(NSPanel):
     def segmentedIconsChange_(self, sender):
         selected_index = sender.selectedSegment()
         selected_style = list(LogoStyle)[selected_index]
+
+        # temporarily set the icon to the selected style
+        susops_app.config['logo_style'] = selected_style.value
         susops_app.update_icon(selected_style)
 
     def toggleLaunchAtLogin_(self, sender):
@@ -649,6 +652,8 @@ class SettingsPanel(NSPanel):
         subprocess.call(["osascript", "-e", applescript])
 
     def cancelSettings_(self, sender):
+        # reset the logo style to the saved one
+        susops_app.config = susops_app.load_config()
         susops_app.update_icon()
         self.close()
 
