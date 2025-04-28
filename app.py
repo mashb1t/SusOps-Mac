@@ -504,6 +504,32 @@ class SettingsPanel(NSPanel):
         # self.launch_checkbox.setAction_("toggleLaunchAtLogin:")
         content.addSubview_(self.launch_checkbox)
 
+        # --- Logo Style ---
+        y -= 40
+        self.logo_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.logo_label.setStringValue_("Logo Style:")
+        self.logo_label.setAlignment_(2)
+        self.logo_label.setBezeled_(False)
+        self.logo_label.setDrawsBackground_(False)
+        self.logo_label.setEditable_(False)
+        content.addSubview_(self.logo_label)
+
+        self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.segmented_icons.setSegmentCount_(len(LogoStyle))
+        self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
+
+        self.segmented_icons.setControlSize_(NSRegularControlSize)
+
+        for idx, style in enumerate(LogoStyle):
+            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
+            icon.setSize_((24, 24))
+            self.segmented_icons.setImage_forSegment_(icon, idx)
+            self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
+
+        self.segmented_icons.setTarget_(self)
+        self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
+        content.addSubview_(self.segmented_icons)
+
         # --- SSH Host ---
         y -= 40
         self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
@@ -543,32 +569,6 @@ class SettingsPanel(NSPanel):
         self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
         content.addSubview_(self.pac_field)
 
-        # --- Logo Style ---
-        y -= 40
-        self.logo_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
-        self.logo_label.setStringValue_("Logo Style:")
-        self.logo_label.setAlignment_(2)
-        self.logo_label.setBezeled_(False)
-        self.logo_label.setDrawsBackground_(False)
-        self.logo_label.setEditable_(False)
-        content.addSubview_(self.logo_label)
-
-        self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
-        self.segmented_icons.setSegmentCount_(len(LogoStyle))
-        self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
-
-        self.segmented_icons.setControlSize_(NSRegularControlSize)
-
-        for idx, style in enumerate(LogoStyle):
-            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
-            icon.setSize_((24, 24))
-            self.segmented_icons.setImage_forSegment_(icon, idx)
-            self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
-
-        self.segmented_icons.setTarget_(self)
-        self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
-        content.addSubview_(self.segmented_icons)
-
         # --- Save/Cancel Buttons ---
         y -= 40
         cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, y, 80, 30))
@@ -592,7 +592,15 @@ class SettingsPanel(NSPanel):
 
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
-        # write prefs with newline
+
+        selected_index = self.segmented_icons.selectedSegment()
+        selected_style = list(LogoStyle)[selected_index]
+        with open(os.path.join(ws, "logo_style"), "w") as f:
+            f.write(selected_style.value)
+
+        susops_app.config = susops_app.load_config()
+        susops_app.update_icon(selected_style)
+
         for name, label, field in (("ssh_host", self.ssh_label, self.ssh_field),
                                    ("socks_port", self.socks_label, self.socks_field),
                                    ("pac_port", self.pac_label, self.pac_field)):
@@ -603,14 +611,6 @@ class SettingsPanel(NSPanel):
             val = str(value_stripped) + "\n"
             with open(os.path.join(ws, name), "w") as f:
                 f.write(val)
-
-        selected_index = self.segmented_icons.selectedSegment()
-        selected_style = list(LogoStyle)[selected_index]
-        with open(os.path.join(ws, "logo_style"), "w") as f:
-            f.write(selected_style.value)
-
-        susops_app.config = susops_app.load_config()
-        susops_app.update_icon(selected_style)
 
         self.close()
         susops_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
