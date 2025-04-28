@@ -18,7 +18,8 @@ from Cocoa import (
     NSImageView, NSImage, NSFont, NSAttributedString, NSHTMLTextDocumentType,
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
     NSForegroundColorAttributeName, NSColor, NSRadioButton, NSOnState, NSOffState,
-    NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown
+    NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown,
+    NSSwitchButton
 )
 from Foundation import NSBundle, NSData, NSDictionary
 
@@ -239,7 +240,7 @@ class SusOpsApp(rumps.App):
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 230)
+            frame = NSMakeRect(0, 0, 310, 260)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -252,6 +253,16 @@ class SusOpsApp(rumps.App):
         self._settings_panel.ssh_field.setStringValue_(config['ssh_host'])
         self._settings_panel.socks_field.setStringValue_(config['socks_port'])
         self._settings_panel.pac_field.setStringValue_(config['pac_port'])
+
+        app_path = os.path.basename(NSBundle.mainBundle().bundlePath())
+        app_name = os.path.splitext(os.path.basename(app_path))[0]
+        script = 'tell application "System Events" to get name of every login item'
+        try:
+            out = subprocess.check_output(["osascript", "-e", script])
+            enabled = app_name in out.decode()
+        except:
+            enabled = False
+        self._settings_panel.launch_checkbox.setState_(NSOnState if enabled else NSOffState)
 
         # get index of current logo style
         logo_style = config['logo_style']
@@ -481,10 +492,20 @@ class SettingsPanel(NSPanel):
         self.setTitle_("Settings")
         self.setLevel_(NSFloatingWindowLevel)
         content = self.contentView()
-        win_h = frame.size.height - 30
+        win_h = frame.size.height
+
+        # --- Launch at Login Checkbox ---
+        y = win_h - 40
+        self.launch_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.launch_checkbox.setButtonType_(NSSwitchButton)
+        self.launch_checkbox.setTitle_("Launch at Login")
+
+        self.launch_checkbox.setTarget_(self)
+        self.launch_checkbox.setAction_("toggleLaunchAtLogin:")
+        content.addSubview_(self.launch_checkbox)
 
         # --- SSH Host ---
-        y = win_h - 20
+        y -= 40
         self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
         self.ssh_label.setStringValue_("SSH Host:")
         self.ssh_label.setAlignment_(2)
@@ -597,6 +618,27 @@ class SettingsPanel(NSPanel):
         selected_style = list(LogoStyle)[selected_index]
         susops_app.update_icon(selected_style)
 
+    def toggleLaunchAtLogin_(self, sender):
+        enabled = (sender.state() == NSOnState)
+        bundle = NSBundle.mainBundle()
+        app_path = bundle.bundlePath()
+        bin_name = os.path.splitext(os.path.basename(app_path))[0]
+
+        if enabled:
+            applescript = '''
+                tell application "System Events"
+                    make login item at end with properties {path:"%s", hidden:false}
+                end tell
+            ''' % app_path
+        else:
+            applescript = '''
+                tell application "System Events"
+                    delete login item "%s"
+                end tell
+            ''' % bin_name
+
+        subprocess.call(["osascript", "-e", applescript])
+
     def cancelSettings_(self, sender):
         susops_app.update_icon()
         self.close()
@@ -705,10 +747,7 @@ class AboutPanel(NSPanel):
         win_h = frame.size.height
         icon_size = 64
 
-        # load icon from bundle resources
-        bundle = NSBundle.mainBundle()
-        res_path = bundle.resourcePath()
-        img_path = f"images/icons/logo_dark_stopped_partially.svg"
+        img_path = get_logo_style_image(LogoStyle.COG, ProcessState.STOPPED_PARTIALLY)
         # icon view centered at top
         x_icon = (win_w - icon_size) / 2
         y_icon = win_h - icon_size - 10
