@@ -123,7 +123,7 @@ class SusOpsApp(rumps.App):
             rumps.MenuItem("Reset All", callback=self.reset),
             None,
             rumps.MenuItem("About", callback=self.open_about),
-            rumps.MenuItem("Quit SusOps", callback=self.quit_app, key="q")
+            rumps.MenuItem("Quit", callback=self.quit_app, key="q")
         ]
 
         self._check_timer = rumps.Timer(self.timer_check_state, 5)
@@ -225,17 +225,43 @@ class SusOpsApp(rumps.App):
         self._settings_panel.pac_field.setStringValue_(prefs['pac_port'])
         self._settings_panel.run()
 
-    def add_domain(self, _):
-        host = rumps.Window(
+    def show_restart_dialog(self, title, message):
+        if self.process_state != ProcessState.RUNNING:
+            alert_foreground(title, message)
+            return
+
+        restart = alert_foreground(
+            title,
+            message,
+            ok="Restart Proxy", cancel="Skip"
+        )
+
+        if restart == 1:
+            self.restart_proxy(None)
+
+    def add_domain(self, sender, default_text=''):
+        result = rumps.Window(
             "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules",
-            "SusOps: Add Domain", ok="Add", cancel="Cancel", dimensions=(220, 20)).run().text
-        if host:
-            output, _ = self.run_susops(f"add {host}")
-            rumps.notification("SusOps", "Add Domain", output)
+            "Add Domain", default_text, "Add", "Cancel", (220, 20)).run()
+
+        if result.clicked == 0:
+            return
+
+        host = result.text.strip()
+        if not host:
+            alert_foreground("Error", "Domain cannot be empty")
+            self.add_domain(sender)
+            return
+
+        output, returncode = self.run_susops(f"add {host}")
+        if returncode == 0:
+            alert_foreground("Success", output)
+        else:
+            self.add_domain(sender, result.text)
 
     def add_local_forward(self, _):
         if not self._local_panel:
-            frame = NSMakeRect(0, 0, 340, 150)
+            frame = NSMakeRect(0, 0, 350, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self._local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -244,14 +270,14 @@ class SusOpsApp(rumps.App):
             self._local_panel.parent_app = self
 
         self._local_panel.configure_fields([
-            ('remote_port_field', 'Forward Remote Port:'),
-            ('local_port_field', 'To Local Port:'),
+            ('remote_port_field', 'Make Remote Port:'),
+            ('local_port_field', 'Available on Local Port:'),
         ])
         self._local_panel.run()
 
     def add_remote_forward(self, _):
         if not self._remote_panel:
-            frame = NSMakeRect(0, 0, 340, 150)
+            frame = NSMakeRect(0, 0, 350, 150)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self._remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -260,35 +286,74 @@ class SusOpsApp(rumps.App):
             self._remote_panel.parent_app = self
 
         self._remote_panel.configure_fields([
-            ('local_port_field', 'Forward Local Port:'),
-            ('remote_port_field', 'To Remote Port:'),
+            ('local_port_field', 'Make Local Port:'),
+            ('remote_port_field', 'Available on Remote Port:'),
         ])
         self._remote_panel.run()
 
-    def remove_domain(self, _):
-        host = rumps.Window("Enter domain to remove (no protocol):", "SusOps: Remove Domain",
-                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
-        if host:
-            output, _ = self.run_susops(f"rm {host}")
-            rumps.notification("SusOps", "Remove Domain", output)
+    def remove_domain(self, sender, default_text=''):
+        result = rumps.Window("Enter domain to remove (without protocol):",
+                              "Remove Domain", default_text, "Remove", "Cancel", (220, 20)).run()
 
-    def remove_local_forward(self, _):
-        port = rumps.Window("Enter port to remove:", "SusOps: Remove Local Forward",
-                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
-        if port:
-            output, _ = self.run_susops(f"rm -l {port}")
-            rumps.notification("SusOps", "Remove Local Forward", output)
+        if result.clicked == 0:
+            return
 
-    def remove_remote_forward(self, _):
-        port = rumps.Window("Enter port to remove:", "SusOps: Remove Remote Forward",
-                            ok="Remove", cancel="Cancel", dimensions=(220, 20)).run().text
-        if port:
-            output, _ = self.run_susops(f"rm -r {port}")
-            rumps.notification("SusOps", "Remove Remote Forward", output)
+        host = result.text.strip()
+        if not host:
+            alert_foreground("Error", "Domain cannot be empty")
+            self.remove_domain(sender)
+            return
+
+        output, returncode = self.run_susops(f"rm {host}")
+        if returncode != 0:
+            alert_foreground("Success", output)
+            return self.remove_domain(sender, host)
+        else:
+            self.show_restart_dialog("Success", output)
+
+    def remove_local_forward(self, sender, default_text=''):
+        result = rumps.Window("Enter port to remove:", "Remove Local Forward",
+                              default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
+
+        if result.clicked == 0:
+            return
+
+        port = result.text.strip()
+
+        if not port:
+            alert_foreground("Error", "Port cannot be empty")
+            self.remove_local_forward(sender)
+            return
+
+        output, returncode = self.run_susops(f"rm -l {port}")
+        if returncode != 0:
+            return self.remove_local_forward(sender, port)
+        else:
+            self.show_restart_dialog("Success", output)
+
+    def remove_remote_forward(self, sender, default_text=''):
+        result = rumps.Window("Enter port to remove:", "Remove Remote Forward",
+                              default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
+
+        if result.clicked == 0:
+            return
+
+        port = result.text.strip()
+
+        if not port:
+            alert_foreground("Error", "Port cannot be empty")
+            self.remove_remote_forward(sender)
+            return
+
+        output, returncode = self.run_susops(f"rm -r {port}")
+        if returncode != 0:
+            return self.remove_remote_forward(sender, port)
+        else:
+            self.show_restart_dialog("Success", output)
 
     def list_hosts(self, _):
         output, _ = self.run_susops("ls")
-        alert_foreground("SusOps Hosts", output)
+        alert_foreground("Domains & Forwards", output)
 
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
@@ -327,7 +392,7 @@ class SusOpsApp(rumps.App):
         alert_foreground("SusOps Status", output)
 
     def test_any(self, _):
-        host = rumps.Window("Enter hostname or port to test: ", "SusOps: Test Any",
+        host = rumps.Window("Enter domain or port to test: ", "Test Any",
                             ok="Test", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
             output, _ = self.run_susops(f"test {host}", False)
@@ -349,15 +414,15 @@ class SusOpsApp(rumps.App):
     def reset(self, _):
         result = alert_foreground(
             "Reset Everything?",
-            "This will stop susops and remove all of its configs. You will have to reconfigure the ssh host as well as ports.\n\nAre you sure?",
-            ok="Yes", cancel="No"
+            "This will stop SusOps and remove all of its configs. You will have to reconfigure the ssh host as well as ports.\n\nAre you sure?",
+            ok="Reset Everything", cancel="Cancel"
         )
 
         if result == 1:
             self.run_susops("reset --force", False)
 
     def open_about(self, _):
-        if not self._about_panel is None:
+        if self._about_panel is None:
             frame = NSMakeRect(0, 0, 280, 190)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -383,7 +448,7 @@ class SettingsPanel(NSPanel):
         if not self:
             return None
 
-        self.setTitle_("SusOps Settings")
+        self.setTitle_("Settings")
         self.setLevel_(NSFloatingWindowLevel)
 
         content = self.contentView()
@@ -454,14 +519,7 @@ class SettingsPanel(NSPanel):
                 f.write(val)
 
         self.close()
-        restart = alert_foreground(
-            "Settings Saved",
-            "Settings will be applied on next proxy service start.\n\nRestart proxy service now?",
-            ok="Yes", cancel="No"
-        )
-
-        if restart == 1:
-            self.parent_app.restart_proxy(None)
+        self.parent_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy service start.")
 
     def cancelSettings_(self, sender):
         self.close()
@@ -487,14 +545,14 @@ class TwoFieldPanel(NSPanel):
         content = self.contentView()
 
         # --- Save/Cancel Buttons ---
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(155, 18, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(165, 18, 80, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancel:")
         content.addSubview_(cancel_btn)
 
-        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(245, 18, 80, 30))
+        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(255, 18, 80, 30))
         add_btn.setTitle_("Add")
         add_btn.setBezelStyle_(1)
         add_btn.setTarget_(self)
@@ -518,17 +576,25 @@ class TwoFieldPanel(NSPanel):
 
         y = 100
         for attr, label in field_defs:
-            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y, 140, 24))
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 4, 150, 24))
             lbl.setStringValue_(label)
+            lbl.setAlignment_(2)
             lbl.setBezeled_(False)
             lbl.setDrawsBackground_(False)
             lbl.setEditable_(False)
             self.contentView().addSubview_(lbl)
 
-            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(160, y, 160, 24))
+            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(170, y, 160, 24))
             self.contentView().addSubview_(fld)
             setattr(self, attr, fld)
             y -= 40
+
+    @staticmethod
+    def check_port_range(port, label):
+        if not port.isdigit() or not (1 <= int(port) <= 65535):
+            alert_foreground("Error", f"{label} must be a valid port between 1 and 65535")
+            return False
+        return True
 
     def run(self):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
@@ -667,22 +733,30 @@ class AboutPanel(NSPanel):
 
 class LocalForwardPanel(TwoFieldPanel):
     def add_(self, sender):
-        if (self.local_port_field.stringValue().isdigit() and
-                self.remote_port_field.stringValue().isdigit()):
-            cmd = f"add -l {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
-            out, _ = self.parent_app.run_susops(cmd)
-            rumps.notification("SusOps", "Local Forward Added", out)
-        self.close()
+        if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
+            return
+
+        if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
+            return
+
+        cmd = f"add -l {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
+        output, returncode = self.parent_app.run_susops(cmd)
+        if returncode == 0:
+            self.parent_app.show_restart_dialog("Success", output)
 
 
 class RemoteForwardPanel(TwoFieldPanel):
     def add_(self, sender):
-        if (self.remote_port_field.stringValue().isdigit() and
-                self.local_port_field.stringValue().isdigit()):
-            cmd = f"add -r {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
-            out, _ = self.parent_app.run_susops(cmd)
-            rumps.notification("SusOps", "Remote Forward Added", out)
-        self.close()
+        if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
+            return
+
+        if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
+            return
+
+        cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
+        output, returncode = self.parent_app.run_susops(cmd)
+        if returncode == 0:
+            self.parent_app.show_restart_dialog("Success", output)
 
 
 if __name__ == "__main__":
