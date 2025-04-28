@@ -249,10 +249,15 @@ class SusOpsApp(rumps.App):
             self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-        config = self.load_config()
-        self._settings_panel.ssh_field.setStringValue_(config['ssh_host'])
-        self._settings_panel.socks_field.setStringValue_(config['socks_port'])
-        self._settings_panel.pac_field.setStringValue_(config['pac_port'])
+        self.config = self.load_config()
+        for idx, style in enumerate(LogoStyle):
+            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
+            icon.setSize_((24, 24))
+            self._settings_panel.segmented_icons.setImage_forSegment_(icon, idx)
+            self._settings_panel.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
+        self._settings_panel.ssh_field.setStringValue_(self.config['ssh_host'])
+        self._settings_panel.socks_field.setStringValue_(self.config['socks_port'])
+        self._settings_panel.pac_field.setStringValue_(self.config['pac_port'])
 
         app_path = os.path.basename(NSBundle.mainBundle().bundlePath())
         app_name = os.path.splitext(os.path.basename(app_path))[0]
@@ -265,7 +270,7 @@ class SusOpsApp(rumps.App):
         self._settings_panel.launch_checkbox.setState_(NSOnState if enabled else NSOffState)
 
         # get index of current logo style
-        logo_style = config['logo_style']
+        logo_style = self.config['logo_style']
         selected_index = list(LogoStyle).index(LogoStyle[logo_style.upper()])
         self._settings_panel.segmented_icons.setSelectedSegment_(selected_index)
         self._settings_panel.run()
@@ -399,12 +404,12 @@ class SusOpsApp(rumps.App):
 
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
-        config = self.load_config()
-        if not config['ssh_host']:
+        self.config = self.load_config()
+        if not self.config['ssh_host']:
             alert_foreground("Startup failed", "Please set the SSH Host in Settings")
             self.open_settings(None)
             return
-        cmd = f"{script} start {config['ssh_host']} {config['socks_port']} {config['pac_port']}"
+        cmd = f"{script} start {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
             # Launch using bash -lc and detach from UI process
@@ -424,8 +429,8 @@ class SusOpsApp(rumps.App):
         self.timer_check_state()
 
     def restart_proxy(self, _):
-        config = self.load_config()
-        cmd = f"restart {config['ssh_host']} {config['socks_port']} {config['pac_port']}"
+        self.config = self.load_config()
+        cmd = f"restart {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         output, _ = self.run_susops(cmd)
         self.timer_check_state()
 
@@ -470,6 +475,11 @@ class SusOpsApp(rumps.App):
             self._about_panel = AboutPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
+
+        # Set the image based on the current logo style
+        img_path = get_logo_style_image(LogoStyle[self.config['logo_style'].upper()], ProcessState.STOPPED_PARTIALLY)
+        img = NSImage.alloc().initByReferencingFile_(img_path)
+        self._about_panel.image_view.setImage_(img)
         self._about_panel.run()
 
     def quit_app(self, _):
@@ -519,12 +529,6 @@ class SettingsPanel(NSPanel):
         self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
 
         self.segmented_icons.setControlSize_(NSRegularControlSize)
-
-        for idx, style in enumerate(LogoStyle):
-            icon = NSImage.alloc().initWithContentsOfFile_(get_logo_style_image(style))
-            icon.setSize_((24, 24))
-            self.segmented_icons.setImage_forSegment_(icon, idx)
-            self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
 
         self.segmented_icons.setTarget_(self)
         self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
@@ -592,15 +596,6 @@ class SettingsPanel(NSPanel):
 
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
-
-        selected_index = self.segmented_icons.selectedSegment()
-        selected_style = list(LogoStyle)[selected_index]
-        with open(os.path.join(ws, "logo_style"), "w") as f:
-            f.write(selected_style.value)
-
-        susops_app.config = susops_app.load_config()
-        susops_app.update_icon(selected_style)
-
         for name, label, field in (("ssh_host", self.ssh_label, self.ssh_field),
                                    ("socks_port", self.socks_label, self.socks_field),
                                    ("pac_port", self.pac_label, self.pac_field)):
@@ -611,6 +606,14 @@ class SettingsPanel(NSPanel):
             val = str(value_stripped) + "\n"
             with open(os.path.join(ws, name), "w") as f:
                 f.write(val)
+
+        selected_index = self.segmented_icons.selectedSegment()
+        selected_style = list(LogoStyle)[selected_index]
+        with open(os.path.join(ws, "logo_style"), "w") as f:
+            f.write(selected_style.value)
+
+        susops_app.config = susops_app.load_config()
+        susops_app.update_icon(selected_style)
 
         self.close()
         susops_app.show_restart_dialog("Settings Saved", "Settings will be applied on next proxy start.")
@@ -749,15 +752,12 @@ class AboutPanel(NSPanel):
         win_h = frame.size.height
         icon_size = 64
 
-        img_path = get_logo_style_image(LogoStyle.COG, ProcessState.STOPPED_PARTIALLY)
         # icon view centered at top
         x_icon = (win_w - icon_size) / 2
         y_icon = win_h - icon_size - 10
         icon_frame = NSMakeRect(x_icon, y_icon, icon_size, icon_size)
-        image_view = NSImageView.alloc().initWithFrame_(icon_frame)
-        img = NSImage.alloc().initByReferencingFile_(img_path)
-        image_view.setImage_(img)
-        content.addSubview_(image_view)
+        self.image_view = NSImageView.alloc().initWithFrame_(icon_frame)
+        content.addSubview_(self.image_view)
 
         # App name
         name_y = y_icon - 25
