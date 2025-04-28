@@ -501,7 +501,7 @@ class SettingsPanel(NSPanel):
         self.launch_checkbox.setTitle_("Launch at Login")
 
         self.launch_checkbox.setTarget_(self)
-        self.launch_checkbox.setAction_("toggleLaunchAtLogin:")
+        # self.launch_checkbox.setAction_("toggleLaunchAtLogin:")
         content.addSubview_(self.launch_checkbox)
 
         # --- SSH Host ---
@@ -588,6 +588,8 @@ class SettingsPanel(NSPanel):
         return self
 
     def saveSettings_(self, sender):
+        self.toggleLaunchAtLogin_(self.launch_checkbox)
+
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
         # write prefs with newline
