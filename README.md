@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="images/iconset/susops.iconset/icon_512.png" alt="Menu" height="200" />
+</p>
+
 # SusOps App for macOS
 
 A native-feeling **menu-bar app** for the [**SusOps CLI**](https://github.com/mashb1t/susops-cli) SSH–proxy
