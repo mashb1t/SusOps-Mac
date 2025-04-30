@@ -766,13 +766,10 @@ class AboutPanel(NSPanel):
         x_icon = (win_w - icon_size) / 2
         y_icon = win_h - icon_size - 10
         icon_frame = NSMakeRect(x_icon, y_icon, icon_size, icon_size)
-        self.image_view = NSImageView.alloc().initWithFrame_(icon_frame)
-
-        img_path = get_logo_style_image(LogoStyle.GEAR, ProcessState.STOPPED_PARTIALLY, Appearance.LIGHT)
-        img = NSImage.alloc().initByReferencingFile_(img_path)
-        self.image_view.setImage_(img)
-
-        content.addSubview_(self.image_view)
+        image_view = NSImageView.alloc().initWithFrame_(icon_frame)
+        img = NSImage.alloc().initByReferencingFile_("images/iconset/susops.iconset/icon_256x256.png")
+        image_view.setImage_(img)
+        content.addSubview_(image_view)
 
         # App name
         name_y = y_icon - 25

@@ -7,6 +7,7 @@ from version import VERSION
 
 # ------------------- resource paths -------------------
 ICON_FILE = os.path.join("images", "iconset", "susops.icns")
+ICON_FOLDER = os.path.join("images", "iconset", "susops.iconset")
 SCRIPT_SRC = os.path.join("susops-cli", "susops.sh")
 
 # ------------------- make shell script executable -------------------
@@ -19,7 +20,7 @@ DATA_FILES = [
     *[(root, [os.path.join(root, f) for f in files])
       for root, dirs, files in os.walk(os.path.join("images", "icons"))],
     (os.path.join("images", "status"), [os.path.join("images", "status", f) for f in os.listdir(os.path.join("images", "status")) if os.path.isfile(os.path.join("images", "status", f))]),
-    (os.path.join("images", "iconset"), [ICON_FILE]),
+    (os.path.join("images", "iconset"), [ICON_FILE, ICON_FOLDER]),
     "version.py"
 ]
 
