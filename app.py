@@ -40,7 +40,7 @@ class ProcessState(Enum):
 
 
 class LogoStyle(Enum):
-    COG = "COG"
+    GEAR = "GEAR"
     COLORED_GLASSES = "COLORED_GLASSES"
     COLORED_S = "COLORED_S"
 
@@ -57,8 +57,7 @@ def get_appearance() -> Appearance:
 def get_logo_style_image(style: LogoStyle, state: ProcessState = ProcessState.STOPPED_PARTIALLY, appearance: Appearance = None) -> str:
     appearance = appearance or get_appearance()
     appearance = Appearance.LIGHT if appearance == Appearance.DARK else Appearance.DARK
-    filetype = "svg" if style == LogoStyle.COG else "png"
-    return os.path.join("images", "icons", style.value.lower(), appearance.value.lower(), f"{state.value.lower()}.{filetype}")
+    return os.path.join("images", "icons", style.value.lower(), appearance.value.lower(), f"{state.value.lower()}.svg")
 
 
 def alert_foreground(title, message, ok=None, cancel=None, other=None, icon_path=None) -> int:
@@ -767,7 +766,7 @@ class AboutPanel(NSPanel):
         icon_frame = NSMakeRect(x_icon, y_icon, icon_size, icon_size)
         self.image_view = NSImageView.alloc().initWithFrame_(icon_frame)
 
-        img_path = get_logo_style_image(LogoStyle.COG, ProcessState.STOPPED_PARTIALLY, Appearance.LIGHT)
+        img_path = get_logo_style_image(LogoStyle.GEAR, ProcessState.STOPPED_PARTIALLY, Appearance.LIGHT)
         img = NSImage.alloc().initByReferencingFile_(img_path)
         self.image_view.setImage_(img)
 
