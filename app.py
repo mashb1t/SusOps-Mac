@@ -466,6 +466,8 @@ class SusOpsApp(rumps.App):
 
         if result == 1:
             self.run_susops("reset --force", False)
+            self.config = self.load_config()
+            self.update_icon()
 
     def open_about(self, _):
         if self._about_panel is None:
