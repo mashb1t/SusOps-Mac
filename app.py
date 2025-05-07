@@ -17,7 +17,7 @@ from Cocoa import (
     NSButton, NSApplication, NSDistributedNotificationCenter,
     NSImageView, NSImage, NSFont, NSAttributedString, NSHTMLTextDocumentType,
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
-    NSForegroundColorAttributeName, NSColor, NSRadioButton, NSOnState, NSOffState,
+    NSForegroundColorAttributeName, NSColor, NSOnState, NSOffState,
     NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown,
     NSSwitchButton
 )
@@ -54,7 +54,8 @@ def get_appearance() -> Appearance:
     return Appearance.DARK if Appearance.DARK.value.lower() in appearance.lower() else Appearance.LIGHT
 
 
-def get_logo_style_image(style: LogoStyle, state: ProcessState = ProcessState.STOPPED_PARTIALLY, appearance: Appearance = None) -> str:
+def get_logo_style_image(style: LogoStyle, state: ProcessState = ProcessState.STOPPED_PARTIALLY,
+                         appearance: Appearance = None) -> str:
     appearance = appearance or get_appearance()
     appearance = Appearance.LIGHT if appearance == Appearance.DARK else Appearance.DARK
     return os.path.join("images", "icons", style.value.lower(), appearance.value.lower(), f"{state.value.lower()}.svg")
@@ -76,7 +77,6 @@ def resource_path(rel_path):
 
 
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
-
 
 # Global instance of the app
 susops_app = None  # type: SusOpsApp|None
@@ -224,7 +224,13 @@ class SusOpsApp(rumps.App):
     @staticmethod
     def load_config():
         ws = os.path.expanduser("~/.susops")
-        defaults = {"ssh_host": "", "socks_port": "1080", "pac_port": "1081", "logo_style": DEFAULT_LOGO_STYLE.value}
+        defaults = {
+            "ssh_host": "",
+            "socks_port": "1080",
+            "pac_port": "1081",
+            "logo_style": DEFAULT_LOGO_STYLE.value,
+            "stop_on_quit": True
+        }
         configs = {}
         for name in defaults:
             path = os.path.join(ws, name)
@@ -233,6 +239,8 @@ class SusOpsApp(rumps.App):
                     configs[name] = f.read().strip()
             except IOError:
                 configs[name] = defaults[name]
+
+        configs['stop_on_quit'] = configs['stop_on_quit'].lower() == '1'
 
         # check if logo_style is valid
         if configs['logo_style'] not in LogoStyle.__members__:
@@ -244,7 +252,7 @@ class SusOpsApp(rumps.App):
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 260)
+            frame = NSMakeRect(0, 0, 310, 290)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -263,10 +271,12 @@ class SusOpsApp(rumps.App):
         script = 'tell application "System Events" to get name of every login item'
         try:
             out = subprocess.check_output(["osascript", "-e", script])
-            enabled = app_name in out.decode()
+            launch_at_login = app_name in out.decode()
         except:
-            enabled = False
-        self._settings_panel.launch_checkbox.setState_(NSOnState if enabled else NSOffState)
+            launch_at_login = False
+        self._settings_panel.launch_at_login_checkbox.setState_(NSOnState if launch_at_login else NSOffState)
+
+        self._settings_panel.stop_on_quit_checkbox.setState_(NSOnState if self.config['stop_on_quit'] else NSOffState)
 
         # get index of current logo style
         logo_style = self.config['logo_style']
@@ -479,7 +489,8 @@ class SusOpsApp(rumps.App):
         self._about_panel.run()
 
     def quit_app(self, _):
-        self.run_susops("stop --keep-ports", False)
+        if self.config['stop_on_quit']:
+            self.run_susops("stop --keep-ports", False)
         rumps.quit_application()
 
 
@@ -499,20 +510,34 @@ class SettingsPanel(NSPanel):
         self.setLevel_(NSFloatingWindowLevel)
         content = self.contentView()
         win_h = frame.size.height
+        label_margin_left = 20
+        label_width = 80
+        input_margin_left = 110
+        input_width = 180
+        element_height = 24
 
         # --- Launch at Login Checkbox ---
         y = win_h - 40
-        self.launch_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
-        self.launch_checkbox.setButtonType_(NSSwitchButton)
-        self.launch_checkbox.setTitle_("Launch at Login")
+        self.launch_at_login_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
+        self.launch_at_login_checkbox.setButtonType_(NSSwitchButton)
+        self.launch_at_login_checkbox.setTitle_("Launch at Login")
 
-        self.launch_checkbox.setTarget_(self)
-        # self.launch_checkbox.setAction_("toggleLaunchAtLogin:")
-        content.addSubview_(self.launch_checkbox)
+        self.launch_at_login_checkbox.setTarget_(self)
+        # self.launch_at_login_checkbox.setAction_("toggleLaunchAtLogin:")
+        content.addSubview_(self.launch_at_login_checkbox)
+
+        # --- Stop On Close Checkbox ---
+        y -= 30
+        self.stop_on_quit_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
+        self.stop_on_quit_checkbox.setButtonType_(NSSwitchButton)
+        self.stop_on_quit_checkbox.setTitle_("Stop SusOps Proxy on Quit")
+
+        self.stop_on_quit_checkbox.setTarget_(self)
+        content.addSubview_(self.stop_on_quit_checkbox)
 
         # --- Logo Style ---
         y -= 40
-        self.logo_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.logo_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, label_width, element_height))
         self.logo_label.setStringValue_("Logo Style:")
         self.logo_label.setAlignment_(2)
         self.logo_label.setBezeled_(False)
@@ -520,7 +545,7 @@ class SettingsPanel(NSPanel):
         self.logo_label.setEditable_(False)
         content.addSubview_(self.logo_label)
 
-        self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.segmented_icons = NSSegmentedControl.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         self.segmented_icons.setSegmentCount_(len(LogoStyle))
         self.segmented_icons.setTrackingMode_(NSSegmentSwitchTrackingSelectOne)
         self.segmented_icons.setControlSize_(NSRegularControlSize)
@@ -533,7 +558,7 @@ class SettingsPanel(NSPanel):
 
         # --- SSH Host ---
         y -= 40
-        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, label_width, element_height))
         self.ssh_label.setStringValue_("SSH Host:")
         self.ssh_label.setAlignment_(2)
         self.ssh_label.setBezeled_(False)
@@ -541,12 +566,12 @@ class SettingsPanel(NSPanel):
         self.ssh_label.setEditable_(False)
         content.addSubview_(self.ssh_label)
 
-        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         content.addSubview_(self.ssh_field)
 
         # --- SOCKS Port ---
         y -= 40
-        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, 80, element_height))
         self.socks_label.setStringValue_("SOCKS Port:")
         self.socks_label.setAlignment_(2)
         self.socks_label.setBezeled_(False)
@@ -554,12 +579,12 @@ class SettingsPanel(NSPanel):
         self.socks_label.setEditable_(False)
         content.addSubview_(self.socks_label)
 
-        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         content.addSubview_(self.socks_field)
 
         # --- PAC Port ---
         y -= 40
-        self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(20, y - 4, 100, 24))
+        self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, label_width, element_height))
         self.pac_label.setStringValue_("PAC Port:")
         self.pac_label.setAlignment_(2)
         self.pac_label.setBezeled_(False)
@@ -567,19 +592,23 @@ class SettingsPanel(NSPanel):
         self.pac_label.setEditable_(False)
         content.addSubview_(self.pac_label)
 
-        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(130, y, 160, 24))
+        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         content.addSubview_(self.pac_field)
 
         # --- Save/Cancel Buttons ---
+        button_x = input_margin_left - 5
+        button_width = 90
+        button_margin = 10
+
         y -= 40
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(125, y, 80, 30))
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(button_x, y, button_width, element_height))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancelSettings:")
         content.addSubview_(cancel_btn)
 
-        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(215, y, 80, 30))
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(button_x + button_width + button_margin, y, button_width, element_height))
         save_btn.setTitle_("Save")
         save_btn.setBezelStyle_(1)
         save_btn.setTarget_(self)
@@ -597,13 +626,14 @@ class SettingsPanel(NSPanel):
             self.segmented_icons.cell().setImageScaling_forSegment_(NSImageScaleProportionallyDown, idx)
 
     def saveSettings_(self, _):
-        self.toggleLaunchAtLogin_(self.launch_checkbox)
+        self.toggleLaunchAtLogin_(self.launch_at_login_checkbox)
 
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
         for name, label, field in (("ssh_host", self.ssh_label, self.ssh_field),
                                    ("socks_port", self.socks_label, self.socks_field),
-                                   ("pac_port", self.pac_label, self.pac_field)):
+                                   ("pac_port", self.pac_label, self.pac_field),
+                                   ("stop_on_quit", self.stop_on_quit_checkbox, self.stop_on_quit_checkbox)):
             value_stripped = field.stringValue().strip()
             if not value_stripped:
                 alert_foreground("Error", f"Field {label.stringValue().replace(":", "")} cannot be empty")
