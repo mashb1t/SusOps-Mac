@@ -173,9 +173,9 @@ class SusOpsApp(rumps.App):
         match returncode:
             case 0:
                 new_state = ProcessState.RUNNING
-            case 1:
-                new_state = ProcessState.STOPPED_PARTIALLY
             case 2:
+                new_state = ProcessState.STOPPED_PARTIALLY
+            case 3:
                 new_state = ProcessState.STOPPED
             case _:
                 new_state = ProcessState.ERROR
