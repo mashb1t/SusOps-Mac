@@ -94,8 +94,11 @@ class ConfigHelper:
 
     @staticmethod
     def read_config(query: str, default: str):
-        result = subprocess.check_output([ConfigHelper.yq_path, "e", query, ConfigHelper.config_path], encoding="utf-8").strip()
-        if result == "null":
+        try:
+            result = subprocess.check_output([ConfigHelper.yq_path, "e", query, ConfigHelper.config_path], encoding="utf-8").strip()
+            if result == "null" or result == "0":
+                result = default
+        except subprocess.CalledProcessError:
             result = default
         return result
 
@@ -257,8 +260,8 @@ class SusOpsApp(rumps.App):
     def load_config():
         configs = {
             "pac_server_port": ConfigHelper.read_config(".pac_server_port", "1081"),
-            "logo_style": ConfigHelper.read_config(".susops.logo_style", DEFAULT_LOGO_STYLE.value),
-            "stop_on_quit": ConfigHelper.read_config(".susops_app.stop_on_quit", '1') == '1'
+            "logo_style": ConfigHelper.read_config(".susops_app.logo_style", DEFAULT_LOGO_STYLE.value),
+            "stop_on_quit": ConfigHelper.read_config(".susops_app.stop_on_quit", '1') == '1',
         }
 
         # check if logo_style is valid
