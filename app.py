@@ -20,7 +20,7 @@ from Cocoa import (
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
     NSForegroundColorAttributeName, NSColor, NSOnState, NSOffState,
     NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown,
-    NSSwitchButton
+    NSSwitchButton, NSPopUpButton
 )
 from Foundation import NSBundle, NSData, NSDictionary
 
@@ -84,6 +84,13 @@ class ConfigHelper:
     yq_path = resource_path('yq')
     workspace_path = os.path.expanduser("~/.susops")
     config_path = os.path.join(workspace_path, "config.yaml")
+
+    @staticmethod
+    def get_connection_tags():
+        result = subprocess.check_output([ConfigHelper.yq_path, "e", ".connections[].tag", ConfigHelper.config_path], encoding="utf-8").strip()
+        if result == "null":
+            return []
+        return result.splitlines()
 
     @staticmethod
     def read_config(query: str, default: str):
@@ -263,7 +270,7 @@ class SusOpsApp(rumps.App):
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 290)
+            frame = NSMakeRect(0, 0, 310, 210)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -349,7 +356,7 @@ class SusOpsApp(rumps.App):
 
     def add_local_forward(self, _):
         if not self._local_panel:
-            frame = NSMakeRect(0, 0, 350, 150)
+            frame = NSMakeRect(0, 0, 350, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self._local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -357,6 +364,7 @@ class SusOpsApp(rumps.App):
             self._local_panel.setTitle_("Add Local Forward")
 
         self._local_panel.configure_fields([
+            ('tag', 'Tag (optional):'),
             ('remote_port_field', 'Make Remote Port:'),
             ('local_port_field', 'Available on Local Port:'),
         ])
@@ -364,13 +372,14 @@ class SusOpsApp(rumps.App):
 
     def add_remote_forward(self, _):
         if not self._remote_panel:
-            frame = NSMakeRect(0, 0, 350, 150)
+            frame = NSMakeRect(0, 0, 350, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
             self._remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
             self._remote_panel.setTitle_("Add Remote Forward")
         self._remote_panel.configure_fields([
+            ('tag', 'Tag (optional):'),
             ('local_port_field', 'Make Local Port:'),
             ('remote_port_field', 'Available on Remote Port:'),
         ])
@@ -466,17 +475,6 @@ class SusOpsApp(rumps.App):
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
         self.config = self.load_config()
-        # TODO correctly load ssh host
-        # if not self.config['ssh_host']:
-        #     alert_foreground("Startup failed", "Please set the SSH Host in Settings")
-        #     self.open_settings(None)
-        #     return
-
-        # hotfix for missing connection
-        # TODO change and properly implement
-        # self.run_susops(f"add-connection default {self.config['ssh_host']}", False)
-
-        #cmd = f"{script} start {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
             # Launch using bash -lc and detach from UI process
@@ -727,12 +725,12 @@ class SettingsPanel(NSPanel):
         self.makeKeyAndOrderFront_(None)
 
 
-class TwoFieldPanel(NSPanel):
+class ConnectionFieldPanel(NSPanel):
 
     def initWithContentRect_styleMask_backing_defer_(
             self, frame, style, backing, defer
     ):
-        self = objc.super(TwoFieldPanel, self).initWithContentRect_styleMask_backing_defer_(
+        self = objc.super(ConnectionFieldPanel, self).initWithContentRect_styleMask_backing_defer_(
             frame, style, backing, defer
         )
         if not self:
@@ -771,7 +769,25 @@ class TwoFieldPanel(NSPanel):
                 if view.stringValue().endswith(':'):
                     view.removeFromSuperview()
 
-        y = 100
+        y = 20 + 40 + len(field_defs) * 40
+
+        # select for connections with NSPopUpButton
+        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, 150, 24))
+        lbl.setStringValue_("Select Connection:")
+        lbl.setAlignment_(2)
+        lbl.setBezeled_(False)
+        lbl.setDrawsBackground_(False)
+        lbl.setEditable_(False)
+        self.contentView().addSubview_(lbl)
+
+        popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(170, y, 160, 24))
+        popup.setPullsDown_(False)
+        popup.addItemsWithTitles_(ConfigHelper.get_connection_tags())
+        popup.selectItemAtIndex_(0)
+        self.contentView().addSubview_(popup)
+        setattr(self, 'connection', popup)
+        y -= 40
+
         for attr, label in field_defs:
             lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 4, 150, 24))
             lbl.setStringValue_(label)
@@ -924,30 +940,34 @@ class AboutPanel(NSPanel):
         self.makeKeyAndOrderFront_(None)
 
 
-class LocalForwardPanel(TwoFieldPanel):
+class LocalForwardPanel(ConnectionFieldPanel):
     def add_(self, _):
+        connection = self.connection.selectedItem().title()
+
         if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
             return
 
         if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
             return
 
-        cmd = f"add -l {self.local_port_field.stringValue()} {self.remote_port_field.stringValue()}"
+        cmd = f"-c {connection} add -l {self.local_port_field.stringValue().strip()} {self.remote_port_field.stringValue().strip()} {self.tag.stringValue().strip()}"
         output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
 
 
-class RemoteForwardPanel(TwoFieldPanel):
+class RemoteForwardPanel(ConnectionFieldPanel):
     def add_(self, _):
+        connection = self.connection.selectedItem().title()
+
         if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
             return
 
         if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
             return
 
-        cmd = f"add -r {self.remote_port_field.stringValue()} {self.local_port_field.stringValue()}"
+        cmd = f"-c {connection} add -r {self.remote_port_field.stringValue().strip()} {self.local_port_field.stringValue().strip()} {self.tag.stringValue().strip()}"
         output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
