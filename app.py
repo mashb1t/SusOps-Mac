@@ -340,6 +340,7 @@ class SusOpsApp(rumps.App):
             self.add_connection(sender, result.text)
 
     def add_domain(self, sender, default_text=''):
+        # TODO use custom dialog here
         result = rumps.Window(
             "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added to the PAC rules.",
             "Add Domain", default_text, "Add", "Cancel", (220, 20)).run()
@@ -391,6 +392,7 @@ class SusOpsApp(rumps.App):
         self._remote_panel.run()
 
     def remove_connection(self, sender, default_text=''):
+        # TODO use custom dialog with select
         result = rumps.Window("Enter connection to remove:",
                               "Remove Connection", default_text, "Remove", "Cancel", (220, 20)).run()
 
@@ -411,6 +413,7 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_domain(self, sender, default_text=''):
+        # TODO use custom dialog with select here
         result = rumps.Window("Enter domain to remove (without protocol):",
                               "Remove Domain", default_text, "Remove", "Cancel", (220, 20)).run()
 
@@ -431,6 +434,7 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_local_forward(self, sender, default_text=''):
+        # TODO use custom dialog with select here
         result = rumps.Window("Enter port to remove:", "Remove Local Forward",
                               default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
 
@@ -451,6 +455,7 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_remote_forward(self, sender, default_text=''):
+        # TODO use custom dialog with select here
         result = rumps.Window("Enter port to remove:", "Remove Remote Forward",
                               default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
 
@@ -473,6 +478,7 @@ class SusOpsApp(rumps.App):
     def list_config(self, _):
         output, _ = self.run_susops("ls")
         alert_foreground("Domains & Forwards", output)
+        # TODO check why an error occurs here
 
     def open_config_file(self, _):
         self.run_susops("config")
