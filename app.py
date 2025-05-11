@@ -262,6 +262,7 @@ class SusOpsApp(rumps.App):
             "pac_server_port": ConfigHelper.read_config(".pac_server_port", "1081"),
             "logo_style": ConfigHelper.read_config(".susops_app.logo_style", DEFAULT_LOGO_STYLE.value),
             "stop_on_quit": ConfigHelper.read_config(".susops_app.stop_on_quit", '1') == '1',
+            "ephemeral_ports": ConfigHelper.read_config(".susops_app.ephemeral_ports", '1') == '1'
         }
 
         # check if logo_style is valid
@@ -273,7 +274,7 @@ class SusOpsApp(rumps.App):
     def open_settings(self, _):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 210)
+            frame = NSMakeRect(0, 0, 310, 250)
             style = (
                     NSWindowStyleMaskTitled
                     | NSWindowStyleMaskClosable
@@ -296,6 +297,7 @@ class SusOpsApp(rumps.App):
         self._settings_panel.launch_at_login_checkbox.setState_(NSOnState if launch_at_login else NSOffState)
 
         self._settings_panel.stop_on_quit_checkbox.setState_(NSOnState if self.config['stop_on_quit'] else NSOffState)
+        self._settings_panel.ephemeral_ports_checkbox.setState_(NSOnState if self.config['ephemeral_ports'] else NSOffState)
 
         # get index of current logo style
         logo_style = self.config['logo_style']
@@ -493,7 +495,9 @@ class SusOpsApp(rumps.App):
             alert_foreground("Error starting proxy", str(e))
 
     def stop_proxy(self, _):
-        output, _ = self.run_susops("stop --keep-ports")
+        ports_flag = "--keep-ports" if not self.config['ephemeral_ports'] else ""
+
+        output, _ = self.run_susops(f"stop {ports_flag}")
         self.timer_check_state()
 
     def restart_proxy(self, _):
@@ -590,10 +594,19 @@ class SettingsPanel(NSPanel):
         y -= 30
         self.stop_on_quit_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         self.stop_on_quit_checkbox.setButtonType_(NSSwitchButton)
-        self.stop_on_quit_checkbox.setTitle_("Stop SusOps Proxy on Quit")
+        self.stop_on_quit_checkbox.setTitle_("Stop SusOps Proxy On Quit")
 
         self.stop_on_quit_checkbox.setTarget_(self)
         content.addSubview_(self.stop_on_quit_checkbox)
+
+        # --- Ephemeral Ports Checkbox ---
+        y -= 30
+        self.ephemeral_ports_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
+        self.ephemeral_ports_checkbox.setButtonType_(NSSwitchButton)
+        self.ephemeral_ports_checkbox.setTitle_("Random SSH Ports On Start")
+
+        self.ephemeral_ports_checkbox.setTarget_(self)
+        content.addSubview_(self.ephemeral_ports_checkbox)
 
         # --- Logo Style ---
         y -= 40
@@ -676,6 +689,12 @@ class SettingsPanel(NSPanel):
             alert_foreground("Error", f"Field {self.stop_on_quit_checkbox.stringValue().rstrip(':')} cannot be empty")
             return
         ConfigHelper.update_config(f".susops_app.stop_on_quit = \"{stop_on_quit}\"")
+
+        ephemeral_ports = self.ephemeral_ports_checkbox.stringValue().strip()
+        if not ephemeral_ports:
+            alert_foreground("Error", f"Field {self.ephemeral_ports.stringValue().rstrip(':')} cannot be empty")
+            return
+        ConfigHelper.update_config(f".susops_app.ephemeral_ports = \"{ephemeral_ports}\"")
 
         selected_index = self.segmented_icons.selectedSegment()
         selected_style = list(LogoStyle)[selected_index]
