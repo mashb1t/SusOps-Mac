@@ -5,6 +5,7 @@ from enum import Enum
 
 import objc
 import rumps
+
 from AppKit import (
     NSWindowStyleMaskTitled,
     NSWindowStyleMaskClosable,
@@ -78,6 +79,24 @@ def resource_path(rel_path):
 
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
+
+class ConfigHelper:
+    yq_path = resource_path('yq')
+    workspace_path = os.path.expanduser("~/.susops")
+    config_path = os.path.join(workspace_path, "config.yaml")
+
+    @staticmethod
+    def read_config(query: str, default: str):
+        result = subprocess.check_output([ConfigHelper.yq_path, "e", query, ConfigHelper.config_path], encoding="utf-8").strip()
+        if result == "null":
+            result = default
+        return result
+
+    @staticmethod
+    def update_config(query: str):
+        subprocess.run([ConfigHelper.yq_path, "e", "-i", query, ConfigHelper.config_path, ], check=True)
+
+
 # Global instance of the app
 susops_app = None  # type: SusOpsApp|None
 
@@ -115,17 +134,22 @@ class SusOpsApp(rumps.App):
         self._remote_panel = None
         self._about_panel = None
 
+        self.connections = []
+
+
         self.menu = [
             rumps.MenuItem("Status", callback=self.check_status),
             None,
             rumps.MenuItem("Settings…", callback=self.open_settings, key=","),
             None,
             (rumps.MenuItem("Add"), [
+                rumps.MenuItem("Add Connection", callback=self.add_connection),
                 rumps.MenuItem("Add Domain", callback=self.add_domain),
                 rumps.MenuItem("Add Local Forward", callback=self.add_local_forward),
                 rumps.MenuItem("Add Remote Forward", callback=self.add_remote_forward),
             ]),
             (rumps.MenuItem("Remove"), [
+                rumps.MenuItem("Remove Connection", callback=self.remove_connection),
                 rumps.MenuItem("Remove Domain", callback=self.remove_domain),
                 rumps.MenuItem("Remove Local Forward", callback=self.remove_local_forward),
                 rumps.MenuItem("Remove Remote Forward", callback=self.remove_remote_forward),
@@ -224,31 +248,16 @@ class SusOpsApp(rumps.App):
 
     @staticmethod
     def load_config():
-        ws = os.path.expanduser("~/.susops")
-        defaults = {
-            "ssh_host": "",
-            "socks_port": "1080",
-            "pac_port": "1081",
-            "logo_style": DEFAULT_LOGO_STYLE.value,
-            "stop_on_quit": '1'
+        configs = {
+            "pac_server_port": ConfigHelper.read_config(".pac_server_port", "1081"),
+            "logo_style": ConfigHelper.read_config(".susops.logo_style", DEFAULT_LOGO_STYLE.value),
+            "stop_on_quit": ConfigHelper.read_config(".susops_app.stop_on_quit", '1') == '1'
         }
-        # TODO rework and read from yaml
-        configs = {}
-        for name in defaults:
-            path = os.path.join(ws, name)
-            try:
-                with open(path) as f:
-                    configs[name] = f.read().strip()
-            except IOError:
-                configs[name] = defaults[name]
-
-        configs['stop_on_quit'] = configs['stop_on_quit'] == '1'
 
         # check if logo_style is valid
         if configs['logo_style'] not in LogoStyle.__members__:
             configs['logo_style'] = DEFAULT_LOGO_STYLE.value
-            with open(os.path.join(ws, "logo_style"), "w") as f:
-                f.write(configs['logo_style'])
+            ConfigHelper.update_config(f".susops_app.logo_style = \"{configs['logo_style']}\"")
         return configs
 
     def open_settings(self, _):
@@ -264,9 +273,7 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
         self.config = self.load_config()
-        self._settings_panel.ssh_field.setStringValue_(self.config['ssh_host'])
-        self._settings_panel.socks_field.setStringValue_(self.config['socks_port'])
-        self._settings_panel.pac_field.setStringValue_(self.config['pac_port'])
+        self._settings_panel.pac_field.setStringValue_(self.config['pac_server_port'])
 
         app_path = os.path.basename(NSBundle.mainBundle().bundlePath())
         app_name = os.path.splitext(os.path.basename(app_path))[0]
@@ -300,9 +307,29 @@ class SusOpsApp(rumps.App):
         if restart == 1:
             self.restart_proxy(None)
 
+    def add_connection(self, sender, default_text=''):
+        result = rumps.Window(
+            "Enter connection to add:",
+            "Add Connection", default_text, "Add", "Cancel", (220, 20)).run()
+
+        if result.clicked == 0:
+            return
+
+        connection = result.text.strip()
+        if not connection:
+            alert_foreground("Error", "Connection cannot be empty")
+            self.add_connection(sender)
+            return
+
+        output, returncode = self.run_susops(f"add-connection {connection}")
+        if returncode == 0:
+            alert_foreground("Success", output)
+        else:
+            self.add_connection(sender, result.text)
+
     def add_domain(self, sender, default_text=''):
         result = rumps.Window(
-            "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added. to the PAC rules",
+            "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added to the PAC rules.",
             "Add Domain", default_text, "Add", "Cancel", (220, 20)).run()
 
         if result.clicked == 0:
@@ -348,6 +375,26 @@ class SusOpsApp(rumps.App):
             ('remote_port_field', 'Available on Remote Port:'),
         ])
         self._remote_panel.run()
+
+    def remove_connection(self, sender, default_text=''):
+        result = rumps.Window("Enter connection to remove:",
+                              "Remove Connection", default_text, "Remove", "Cancel", (220, 20)).run()
+
+        if result.clicked == 0:
+            return
+
+        connection = result.text.strip()
+        if not connection:
+            alert_foreground("Error", "Connection cannot be empty")
+            self.remove_domain(sender)
+            return
+
+        output, returncode = self.run_susops(f"rm-connection {connection}")
+        if returncode != 0:
+            alert_foreground("Success", output)
+            return self.remove_domain(sender, connection)
+        else:
+            self.show_restart_dialog("Success", output)
 
     def remove_domain(self, sender, default_text=''):
         result = rumps.Window("Enter domain to remove (without protocol):",
@@ -419,21 +466,22 @@ class SusOpsApp(rumps.App):
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
         self.config = self.load_config()
-        if not self.config['ssh_host']:
-            alert_foreground("Startup failed", "Please set the SSH Host in Settings")
-            self.open_settings(None)
-            return
+        # TODO correctly load ssh host
+        # if not self.config['ssh_host']:
+        #     alert_foreground("Startup failed", "Please set the SSH Host in Settings")
+        #     self.open_settings(None)
+        #     return
 
         # hotfix for missing connection
         # TODO change and properly implement
-        self.run_susops(f"add-connection default {self.config['ssh_host']}", False)
+        # self.run_susops(f"add-connection default {self.config['ssh_host']}", False)
 
-        cmd = f"{script} start {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
+        #cmd = f"{script} start {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
             # Launch using bash -lc and detach from UI process
             subprocess.Popen([
-                shell, '-c', cmd
+                shell, '-c', f"{script} start"
             ], stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
@@ -449,8 +497,9 @@ class SusOpsApp(rumps.App):
 
     def restart_proxy(self, _):
         self.config = self.load_config()
-        cmd = f"restart {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
-        output, _ = self.run_susops(cmd)
+        # TODO check if correct
+        # cmd = f"restart {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
+        output, _ = self.run_susops("restart")
         self.timer_check_state()
 
     def check_status(self, _):
@@ -566,32 +615,6 @@ class SettingsPanel(NSPanel):
         self.segmented_icons.setAction_("segmentedIconsChange:")  # define this method to handle clicks
         content.addSubview_(self.segmented_icons)
 
-        # --- SSH Host ---
-        y -= 40
-        self.ssh_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, label_width, element_height))
-        self.ssh_label.setStringValue_("SSH Host:")
-        self.ssh_label.setAlignment_(2)
-        self.ssh_label.setBezeled_(False)
-        self.ssh_label.setDrawsBackground_(False)
-        self.ssh_label.setEditable_(False)
-        content.addSubview_(self.ssh_label)
-
-        self.ssh_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
-        content.addSubview_(self.ssh_field)
-
-        # --- SOCKS Port ---
-        y -= 40
-        self.socks_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, 80, element_height))
-        self.socks_label.setStringValue_("SOCKS Port:")
-        self.socks_label.setAlignment_(2)
-        self.socks_label.setBezeled_(False)
-        self.socks_label.setDrawsBackground_(False)
-        self.socks_label.setEditable_(False)
-        content.addSubview_(self.socks_label)
-
-        self.socks_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
-        content.addSubview_(self.socks_field)
-
         # --- PAC Port ---
         y -= 40
         self.pac_label = NSTextField.alloc().initWithFrame_(NSMakeRect(label_margin_left, y - 4, label_width, element_height))
@@ -640,22 +663,22 @@ class SettingsPanel(NSPanel):
 
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
-        for name, label, field in (("ssh_host", self.ssh_label, self.ssh_field),
-                                   ("socks_port", self.socks_label, self.socks_field),
-                                   ("pac_port", self.pac_label, self.pac_field),
-                                   ("stop_on_quit", self.stop_on_quit_checkbox, self.stop_on_quit_checkbox)):
-            value_stripped = field.stringValue().strip()
-            if not value_stripped:
-                alert_foreground("Error", f"Field {label.stringValue().replace(":", "")} cannot be empty")
-                return
-            val = str(value_stripped) + "\n"
-            with open(os.path.join(ws, name), "w") as f:
-                f.write(val)
+
+        pac_server_port = self.pac_field.stringValue().strip()
+        if not pac_server_port:
+            alert_foreground("Error", f"Field {self.pac_label.stringValue().rstrip(':')} cannot be empty")
+            return
+        ConfigHelper.update_config(f".pac_server_port = {pac_server_port}")
+
+        stop_on_quit = self.stop_on_quit_checkbox.stringValue().strip()
+        if not stop_on_quit:
+            alert_foreground("Error", f"Field {self.stop_on_quit_checkbox.stringValue().rstrip(':')} cannot be empty")
+            return
+        ConfigHelper.update_config(f".susops_app.stop_on_quit = \"{stop_on_quit}\"")
 
         selected_index = self.segmented_icons.selectedSegment()
         selected_style = list(LogoStyle)[selected_index]
-        with open(os.path.join(ws, "logo_style"), "w") as f:
-            f.write(selected_style.value)
+        ConfigHelper.update_config(f".susops_app.logo_style = \"{selected_style.value}\"")
 
         susops_app.config = susops_app.load_config()
         susops_app.update_icon()

@@ -34,7 +34,7 @@ OPTIONS = {
         "LSUIElement": True,  # menu‑bar only, no dock icon
         "CFBundleIconFile": "susops",
     },
-    "packages": ["rumps"],
+    "packages": ["rumps", "yaml"],
 }
 
 setup(
