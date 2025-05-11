@@ -232,6 +232,7 @@ class SusOpsApp(rumps.App):
             "logo_style": DEFAULT_LOGO_STYLE.value,
             "stop_on_quit": '1'
         }
+        # TODO rework and read from yaml
         configs = {}
         for name in defaults:
             path = os.path.join(ws, name)
@@ -422,6 +423,11 @@ class SusOpsApp(rumps.App):
             alert_foreground("Startup failed", "Please set the SSH Host in Settings")
             self.open_settings(None)
             return
+
+        # hotfix for missing connection
+        # TODO change and properly implement
+        self.run_susops(f"add-connection default {self.config['ssh_host']}", False)
+
         cmd = f"{script} start {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         shell = os.environ.get('SHELL', '/bin/bash')
         try:
