@@ -130,7 +130,8 @@ class SusOpsApp(rumps.App):
                 rumps.MenuItem("Remove Local Forward", callback=self.remove_local_forward),
                 rumps.MenuItem("Remove Remote Forward", callback=self.remove_remote_forward),
             ]),
-            rumps.MenuItem("List All", callback=self.list_hosts),
+            rumps.MenuItem("List All", callback=self.list_config),
+            rumps.MenuItem("Open Config File", callback=self.open_config_file),
             None,
             rumps.MenuItem("Start Proxy", callback=self.start_proxy),
             rumps.MenuItem("Stop Proxy", callback=self.stop_proxy),
@@ -407,9 +408,12 @@ class SusOpsApp(rumps.App):
         else:
             self.show_restart_dialog("Success", output)
 
-    def list_hosts(self, _):
+    def list_config(self, _):
         output, _ = self.run_susops("ls")
         alert_foreground("Domains & Forwards", output)
+
+    def open_config_file(self, _):
+        self.run_susops("config")
 
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
