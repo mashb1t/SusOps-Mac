@@ -229,7 +229,7 @@ class SusOpsApp(rumps.App):
             "socks_port": "1080",
             "pac_port": "1081",
             "logo_style": DEFAULT_LOGO_STYLE.value,
-            "stop_on_quit": True
+            "stop_on_quit": '1'
         }
         configs = {}
         for name in defaults:
@@ -240,7 +240,7 @@ class SusOpsApp(rumps.App):
             except IOError:
                 configs[name] = defaults[name]
 
-        configs['stop_on_quit'] = configs['stop_on_quit'].lower() == '1'
+        configs['stop_on_quit'] = configs['stop_on_quit'] == '1'
 
         # check if logo_style is valid
         if configs['logo_style'] not in LogoStyle.__members__:
