@@ -21,7 +21,8 @@ DATA_FILES = [
       for root, dirs, files in os.walk(os.path.join("images", "icons"))],
     (os.path.join("images", "status"), [os.path.join("images", "status", f) for f in os.listdir(os.path.join("images", "status")) if os.path.isfile(os.path.join("images", "status", f))]),
     (os.path.join("images", "iconset"), [ICON_FILE, ICON_FOLDER]),
-    "version.py"
+    "version.py",
+    "yq"
 ]
 
 OPTIONS = {
@@ -34,7 +35,7 @@ OPTIONS = {
         "LSUIElement": True,  # menu‑bar only, no dock icon
         "CFBundleIconFile": "susops",
     },
-    "packages": ["rumps", "yaml"],
+    "packages": ["rumps"]
 }
 
 setup(
