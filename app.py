@@ -145,6 +145,7 @@ class SusOpsApp(rumps.App):
         self.update_icon()
 
         self._settings_panel = None
+        self._host_panel = None
         self._local_panel = None
         self._remote_panel = None
         self._about_panel = None
@@ -345,25 +346,20 @@ class SusOpsApp(rumps.App):
             self.add_connection(sender, result.text)
 
     def add_domain(self, sender, default_text=''):
-        # TODO use custom dialog here
-        result = rumps.Window(
-            "Enter domain to add (no protocol)\nThis domain and one level of subdomains will be added to the PAC rules.",
-            "Add Domain", default_text, "Add", "Cancel", (220, 20)).run()
-
-        if result.clicked == 0:
-            return
-
-        host = result.text.strip()
-        if not host:
-            alert_foreground("Error", "Domain cannot be empty")
-            self.add_domain(sender)
-            return
-
-        output, returncode = self.run_susops(f"add {host}")
-        if returncode == 0:
-            alert_foreground("Success", output)
-        else:
-            self.add_domain(sender, result.text)
+        frame_width = 300
+        frame_height = 195
+        if not self._host_panel:
+            frame = NSMakeRect(0, 0, frame_width, frame_height)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            self._host_panel = AddHostPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._host_panel.setTitle_("Add Domain")
+            self._host_panel.configure_fields([
+                ('host', "Domain:"),
+            ], label_width=80, input_start_x=120)
+            self._host_panel.add_top_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
+        self._host_panel.run()
 
     def add_local_forward(self, _):
         if not self._local_panel:
@@ -789,7 +785,7 @@ class ConnectionFieldPanel(NSPanel):
 
         return self
 
-    def configure_fields(self, field_defs):
+    def configure_fields(self, field_defs, label_width: int = 150, input_start_x: int = 170, input_width: int = 150):
         """
         field_defs = [(attr_name, label_text), ...]   # order = top → bottom
         Builds one label/field row per entry, 40 px vertical spacing.
@@ -804,25 +800,27 @@ class ConnectionFieldPanel(NSPanel):
 
         y = 20 + 40 + len(field_defs) * 40
 
+        content = self.contentView()
+
         # select for connections with NSPopUpButton
-        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, 150, 24))
-        lbl.setStringValue_("Select Connection:")
+        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
+        lbl.setStringValue_("Connection:")
         lbl.setAlignment_(2)
         lbl.setBezeled_(False)
         lbl.setDrawsBackground_(False)
         lbl.setEditable_(False)
-        self.contentView().addSubview_(lbl)
+        content.addSubview_(lbl)
 
-        popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(170, y, 160, 24))
+        popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
         popup.setPullsDown_(False)
         popup.addItemsWithTitles_(ConfigHelper.get_connection_tags())
         popup.selectItemAtIndex_(0)
-        self.contentView().addSubview_(popup)
+        content.addSubview_(popup)
         setattr(self, 'connection', popup)
         y -= 40
 
         for attr, label in field_defs:
-            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 4, 150, 24))
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 4, label_width, 24))
             lbl.setStringValue_(label)
             lbl.setAlignment_(2)
             lbl.setBezeled_(False)
@@ -830,7 +828,7 @@ class ConnectionFieldPanel(NSPanel):
             lbl.setEditable_(False)
             self.contentView().addSubview_(lbl)
 
-            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(170, y, 160, 24))
+            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
             self.contentView().addSubview_(fld)
             setattr(self, attr, fld)
             y -= 40
@@ -973,6 +971,34 @@ class AboutPanel(NSPanel):
         self.makeKeyAndOrderFront_(None)
 
 
+class AddHostPanel(ConnectionFieldPanel):
+
+    def add_top_label(self, text, frame_width, frame_height):
+        width = frame_width - 15*2
+        height = 18*2
+        frame_height -= 20 + height
+        label = NSTextField.alloc().initWithFrame_(NSMakeRect(15, frame_height, width, height))
+        label.setStringValue_(text)
+        label.setAlignment_(1)
+        label.setBezeled_(False)
+        # label.setDrawsBackground_(False)
+        label.setDrawsBackground_(True)
+        label.setEditable_(False)
+        self.contentView().addSubview_(label)
+
+    def add_(self, _):
+        connection = self.connection.selectedItem().title()
+        host = self.host.stringValue().strip()
+
+        if not host:
+            alert_foreground("Error", "Host must not be empty")
+            return
+
+        cmd = f"-c {connection} add {host}"
+        output, returncode = susops_app.run_susops(cmd)
+        if returncode == 0:
+            alert_foreground("Success", output + "\nPlease re-apply your browser proxy settings.")
+            self.close()
 class LocalForwardPanel(ConnectionFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
