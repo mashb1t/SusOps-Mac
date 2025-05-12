@@ -369,12 +369,11 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
             self._local_panel.setTitle_("Add Local Forward")
-
-        self._local_panel.configure_fields([
-            ('tag', 'Tag (optional):'),
-            ('remote_port_field', 'Make Remote Port:'),
-            ('local_port_field', 'Available on Local Port:'),
-        ])
+            self._local_panel.configure_fields([
+                ('tag', 'Tag (optional):'),
+                ('remote_port_field', 'Make Remote Port:'),
+                ('local_port_field', 'Available on Local Port:'),
+            ])
         self._local_panel.run()
 
     def add_remote_forward(self, _):
@@ -385,15 +384,14 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
             self._remote_panel.setTitle_("Add Remote Forward")
-        self._remote_panel.configure_fields([
-            ('tag', 'Tag (optional):'),
-            ('local_port_field', 'Make Local Port:'),
-            ('remote_port_field', 'Available on Remote Port:'),
-        ])
+            self._remote_panel.configure_fields([
+                ('tag', 'Tag (optional):'),
+                ('local_port_field', 'Make Local Port:'),
+                ('remote_port_field', 'Available on Remote Port:'),
+            ])
         self._remote_panel.run()
 
     def remove_connection(self, sender, default_text=''):
-        # TODO use custom dialog with select
         result = rumps.Window("Enter connection to remove:",
                               "Remove Connection", default_text, "Remove", "Cancel", (220, 20)).run()
 
@@ -999,6 +997,9 @@ class AddHostPanel(ConnectionFieldPanel):
         if returncode == 0:
             alert_foreground("Success", output + "\nPlease re-apply your browser proxy settings.")
             self.close()
+            self.host.setStringValue_("")
+
+
 class LocalForwardPanel(ConnectionFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
@@ -1014,6 +1015,9 @@ class LocalForwardPanel(ConnectionFieldPanel):
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
+            self.tag.setStringValue_("")
+            self.remote_port_field.setStringValue_("")
+            self.local_port_field.setStringValue_("")
 
 
 class RemoteForwardPanel(ConnectionFieldPanel):
@@ -1031,6 +1035,9 @@ class RemoteForwardPanel(ConnectionFieldPanel):
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
+            self.tag.setStringValue_("")
+            self.local_port_field.setStringValue_("")
+            self.remote_port_field.setStringValue_("")
 
 
 if __name__ == "__main__":
