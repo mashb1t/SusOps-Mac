@@ -764,22 +764,6 @@ class ConnectionFieldPanel(NSPanel):
             return None
 
         self.setLevel_(NSFloatingWindowLevel)
-        content = self.contentView()
-
-        # --- Save/Cancel Buttons ---
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(165, 18, 80, 30))
-        cancel_btn.setTitle_("Cancel")
-        cancel_btn.setBezelStyle_(1)
-        cancel_btn.setTarget_(self)
-        cancel_btn.setAction_("cancel:")
-        content.addSubview_(cancel_btn)
-
-        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(255, 18, 80, 30))
-        add_btn.setTitle_("Add")
-        add_btn.setBezelStyle_(1)
-        add_btn.setTarget_(self)
-        add_btn.setAction_("add:")
-        content.addSubview_(add_btn)
 
         return self
 
@@ -830,6 +814,22 @@ class ConnectionFieldPanel(NSPanel):
             self.contentView().addSubview_(fld)
             setattr(self, attr, fld)
             y -= 40
+
+        # --- Save/Cancel Buttons ---
+        x = input_start_x - 5
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x, 18, 80, 30))
+        cancel_btn.setTitle_("Cancel")
+        cancel_btn.setBezelStyle_(1)
+        cancel_btn.setTarget_(self)
+        cancel_btn.setAction_("cancel:")
+        content.addSubview_(cancel_btn)
+
+        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x + 90, 18, 80, 30))
+        add_btn.setTitle_("Add")
+        add_btn.setBezelStyle_(1)
+        add_btn.setTarget_(self)
+        add_btn.setAction_("add:")
+        content.addSubview_(add_btn)
 
     @staticmethod
     def check_port_range(port, label):
