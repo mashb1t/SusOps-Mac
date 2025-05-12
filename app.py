@@ -81,7 +81,7 @@ script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
 class ConfigHelper:
-    yq_path = resource_path('yq')
+    yq_path = resource_path(os.path.join('bin', 'yq'))
     workspace_path = os.path.expanduser("~/.susops")
     config_path = os.path.join(workspace_path, "config.yaml")
 
@@ -107,6 +107,9 @@ class ConfigHelper:
         subprocess.run([ConfigHelper.yq_path, "e", "-i", query, ConfigHelper.config_path, ], check=True)
 
 
+def add_bin_to_path():
+    os.environ['PATH'] = resource_path('bin') + os.pathsep + os.environ.get('PATH', '')
+
 # Global instance of the app
 susops_app = None  # type: SusOpsApp|None
 
@@ -115,6 +118,8 @@ class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
         global susops_app
         susops_app = self
+        add_bin_to_path()
+
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.images_dir = icon_dir or os.path.join(self.base_dir, 'images')
         self.process_state = ProcessState.INITIAL
