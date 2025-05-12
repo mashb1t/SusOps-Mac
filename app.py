@@ -5,7 +5,6 @@ from enum import Enum
 
 import objc
 import rumps
-
 from AppKit import (
     NSWindowStyleMaskTitled,
     NSWindowStyleMaskClosable,
@@ -77,9 +76,6 @@ def resource_path(rel_path):
     return os.path.join(base, rel_path)
 
 
-script = resource_path(os.path.join('susops-cli', 'susops.sh'))
-
-
 class ConfigHelper:
     yq_path = resource_path(os.path.join('bin', 'yq'))
     workspace_path = os.path.expanduser("~/.susops")
@@ -110,8 +106,10 @@ class ConfigHelper:
 def add_bin_to_path():
     os.environ['PATH'] = resource_path('bin') + os.pathsep + os.environ.get('PATH', '')
 
+
 # Global instance of the app
 susops_app = None  # type: SusOpsApp|None
+script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
 class SusOpsApp(rumps.App):
@@ -151,7 +149,6 @@ class SusOpsApp(rumps.App):
         self._about_panel = None
 
         self.connections = []
-
 
         self.menu = [
             rumps.MenuItem("Status", callback=self.check_status),
@@ -412,7 +409,6 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_domain(self, sender, default_text=''):
-        # TODO use custom dialog with select here
         result = rumps.Window("Enter domain to remove (without protocol):",
                               "Remove Domain", default_text, "Remove", "Cancel", (220, 20)).run()
 
@@ -433,7 +429,6 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_local_forward(self, sender, default_text=''):
-        # TODO use custom dialog with select here
         result = rumps.Window("Enter port to remove:", "Remove Local Forward",
                               default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
 
@@ -454,7 +449,6 @@ class SusOpsApp(rumps.App):
             self.show_restart_dialog("Success", output)
 
     def remove_remote_forward(self, sender, default_text=''):
-        # TODO use custom dialog with select here
         result = rumps.Window("Enter port to remove:", "Remove Remote Forward",
                               default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
 
@@ -477,7 +471,6 @@ class SusOpsApp(rumps.App):
     def list_config(self, _):
         output, _ = self.run_susops("ls")
         alert_foreground("Domains & Forwards", output)
-        # TODO check why an error occurs here
 
     def open_config_file(self, _):
         self.run_susops("config")
@@ -507,8 +500,6 @@ class SusOpsApp(rumps.App):
 
     def restart_proxy(self, _):
         self.config = self.load_config()
-        # TODO check if correct
-        # cmd = f"restart {self.config['ssh_host']} {self.config['socks_port']} {self.config['pac_port']}"
         output, _ = self.run_susops("restart")
         self.timer_check_state()
 
@@ -972,8 +963,8 @@ class AboutPanel(NSPanel):
 class AddHostPanel(ConnectionFieldPanel):
 
     def add_top_label(self, text, frame_width, frame_height):
-        width = frame_width - 15*2
-        height = 18*2
+        width = frame_width - 15 * 2
+        height = 18 * 2
         frame_height -= 20 + height
         label = NSTextField.alloc().initWithFrame_(NSMakeRect(15, frame_height, width, height))
         label.setStringValue_(text)
