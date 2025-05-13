@@ -829,6 +829,13 @@ class GenericFieldPanel(NSPanel):
             return False
         return True
 
+    @staticmethod
+    def check_empty(value, label):
+        if not value:
+            alert_foreground("Error", f"{label} must not be empty")
+            return False
+        return True
+
     def run(self):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         self.center()
@@ -988,7 +995,7 @@ class AddConnectionPanel(GenericFieldPanel):
 
 class AddHostPanel(GenericFieldPanel):
 
-    def add_top_label(self, text, frame_width, frame_height):
+    def add_info_label(self, text, frame_width, frame_height):
         width = frame_width - 15 * 2
         height = 18 * 2
         frame_height -= 20 + height
@@ -1004,8 +1011,7 @@ class AddHostPanel(GenericFieldPanel):
         connection = self.connection.selectedItem().title()
         host = self.host.stringValue().strip()
 
-        if not host:
-            alert_foreground("Error", "Host must not be empty")
+        if not self.check_empty(host, "Host"):
             return
 
         cmd = f"-c {connection} add {host}"
@@ -1019,14 +1025,17 @@ class AddHostPanel(GenericFieldPanel):
 class LocalForwardPanel(GenericFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
+        tag = self.tag.stringValue().strip()
+        local_port = self.local_port_field.stringValue().strip()
+        remote_port = self.remote_port_field.stringValue().strip()
 
-        if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
+        if not self.check_port_range(remote_port, "Remote Port"):
             return
 
-        if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
+        if not self.check_port_range(local_port, "Local Port"):
             return
 
-        cmd = f"-c {connection} add -l {self.local_port_field.stringValue().strip()} {self.remote_port_field.stringValue().strip()} {self.tag.stringValue().strip()}"
+        cmd = f"-c {connection} add -l {local_port} {remote_port} {tag}"
         output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
@@ -1040,13 +1049,17 @@ class RemoteForwardPanel(GenericFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
 
-        if not self.check_port_range(self.local_port_field.stringValue(), "Local Port"):
+        tag = self.tag.stringValue().strip()
+        local_port = self.local_port_field.stringValue().strip()
+        remote_port = self.remote_port_field.stringValue().strip()
+
+        if not self.check_port_range(local_port, "Local Port"):
             return
 
-        if not self.check_port_range(self.remote_port_field.stringValue(), "Remote Port"):
+        if not self.check_port_range(remote_port, "Remote Port"):
             return
 
-        cmd = f"-c {connection} add -r {self.remote_port_field.stringValue().strip()} {self.local_port_field.stringValue().strip()} {self.tag.stringValue().strip()}"
+        cmd = f"-c {connection} add -l {remote_port} {local_port} {tag}"
         output, returncode = susops_app.run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
