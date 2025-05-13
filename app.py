@@ -8,7 +8,6 @@ import rumps
 from AppKit import (
     NSWindowStyleMaskTitled,
     NSWindowStyleMaskClosable,
-    NSWindowStyleMaskResizable,
     NSBackingStoreBuffered,
     NSFloatingWindowLevel
 )
@@ -279,11 +278,7 @@ class SusOpsApp(rumps.App):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
             frame = NSMakeRect(0, 0, 310, 250)
-            style = (
-                    NSWindowStyleMaskTitled
-                    | NSWindowStyleMaskClosable
-                    | NSWindowStyleMaskResizable
-            )
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
@@ -328,7 +323,7 @@ class SusOpsApp(rumps.App):
         frame_height = 185
         if not self._connection_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
-            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._connection_panel = AddConnectionPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
@@ -345,7 +340,7 @@ class SusOpsApp(rumps.App):
         frame_height = 195
         if not self._host_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
-            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._host_panel = AddHostPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
@@ -359,7 +354,7 @@ class SusOpsApp(rumps.App):
     def add_local_forward(self, _):
         if not self._local_panel:
             frame = NSMakeRect(0, 0, 350, 230)
-            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
@@ -374,7 +369,7 @@ class SusOpsApp(rumps.App):
     def add_remote_forward(self, _):
         if not self._remote_panel:
             frame = NSMakeRect(0, 0, 350, 230)
-            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
