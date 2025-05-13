@@ -970,8 +970,7 @@ class AddHostPanel(ConnectionFieldPanel):
         label.setStringValue_(text)
         label.setAlignment_(1)
         label.setBezeled_(False)
-        # label.setDrawsBackground_(False)
-        label.setDrawsBackground_(True)
+        label.setDrawsBackground_(False)
         label.setEditable_(False)
         self.contentView().addSubview_(label)
 
