@@ -341,7 +341,7 @@ class SusOpsApp(rumps.App):
         self._connection_panel.run()
 
     def add_domain(self, sender, default_text=''):
-        frame_width = 300
+        frame_width = 280
         frame_height = 195
         if not self._host_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
@@ -352,8 +352,8 @@ class SusOpsApp(rumps.App):
             self._host_panel.setTitle_("Add Domain")
             self._host_panel.configure_fields([
                 ('host', "Domain:"),
-            ], label_width=80, input_start_x=120)
-            self._host_panel.add_top_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
+            ], label_width=80, input_start_x=100)
+            self._host_panel.add_info_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
         self._host_panel.run()
 
     def add_local_forward(self, _):
