@@ -143,6 +143,7 @@ class SusOpsApp(rumps.App):
         self.update_icon()
 
         self._settings_panel = None
+        self._connection_panel = None
         self._host_panel = None
         self._local_panel = None
         self._remote_panel = None
@@ -323,24 +324,21 @@ class SusOpsApp(rumps.App):
             self.restart_proxy(None)
 
     def add_connection(self, sender, default_text=''):
-        result = rumps.Window(
-            "Enter connection to add:",
-            "Add Connection", default_text, "Add", "Cancel", (220, 20)).run()
-
-        if result.clicked == 0:
-            return
-
-        connection = result.text.strip()
-        if not connection:
-            alert_foreground("Error", "Connection cannot be empty")
-            self.add_connection(sender)
-            return
-
-        output, returncode = self.run_susops(f"add-connection {connection}")
-        if returncode == 0:
-            alert_foreground("Success", output)
-        else:
-            self.add_connection(sender, result.text)
+        frame_width = 320
+        frame_height = 185
+        if not self._connection_panel:
+            frame = NSMakeRect(0, 0, frame_width, frame_height)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable)
+            self._connection_panel = AddConnectionPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._connection_panel.setTitle_("Add Connection")
+            self._connection_panel.configure_fields([
+                ('tag', "Connection Tag:"),
+                ('host', "SSH Host:"),
+                ('socks_proxy_port', "SOCKS Proxy Port:"),
+            ], label_width=120, input_start_x=140, hide_connection=True)
+        self._connection_panel.run()
 
     def add_domain(self, sender, default_text=''):
         frame_width = 300
@@ -743,12 +741,12 @@ class SettingsPanel(NSPanel):
         self.makeKeyAndOrderFront_(None)
 
 
-class ConnectionFieldPanel(NSPanel):
+class GenericFieldPanel(NSPanel):
 
     def initWithContentRect_styleMask_backing_defer_(
             self, frame, style, backing, defer
     ):
-        self = objc.super(ConnectionFieldPanel, self).initWithContentRect_styleMask_backing_defer_(
+        self = objc.super(GenericFieldPanel, self).initWithContentRect_styleMask_backing_defer_(
             frame, style, backing, defer
         )
         if not self:
@@ -758,7 +756,8 @@ class ConnectionFieldPanel(NSPanel):
 
         return self
 
-    def configure_fields(self, field_defs, label_width: int = 150, input_start_x: int = 170, input_width: int = 150):
+    def configure_fields(self, field_defs, label_width: int = 150, input_start_x: int = 170, input_width: int = 150,
+                         hide_connection: bool = False):
         """
         field_defs = [(attr_name, label_text), ...]   # order = top → bottom
         Builds one label/field row per entry, 40 px vertical spacing.
@@ -771,25 +770,26 @@ class ConnectionFieldPanel(NSPanel):
                 if view.stringValue().endswith(':'):
                     view.removeFromSuperview()
 
-        y = 20 + 40 + len(field_defs) * 40
-
         content = self.contentView()
 
-        # select for connections with NSPopUpButton
-        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
-        lbl.setStringValue_("Connection:")
-        lbl.setAlignment_(2)
-        lbl.setBezeled_(False)
-        lbl.setDrawsBackground_(False)
-        lbl.setEditable_(False)
-        content.addSubview_(lbl)
+        y = 20 + 40 + len(field_defs) * 40
 
-        popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
-        popup.setPullsDown_(False)
-        popup.addItemsWithTitles_(ConfigHelper.get_connection_tags())
-        popup.selectItemAtIndex_(0)
-        content.addSubview_(popup)
-        setattr(self, 'connection', popup)
+        if not hide_connection:
+            # select for connections with NSPopUpButton
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
+            lbl.setStringValue_("Connection:")
+            lbl.setAlignment_(2)
+            lbl.setBezeled_(False)
+            lbl.setDrawsBackground_(False)
+            lbl.setEditable_(False)
+            content.addSubview_(lbl)
+
+            popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
+            popup.setPullsDown_(False)
+            popup.addItemsWithTitles_(ConfigHelper.get_connection_tags())
+            popup.selectItemAtIndex_(0)
+            content.addSubview_(popup)
+            setattr(self, 'connection', popup)
         y -= 40
 
         for attr, label in field_defs:
@@ -960,7 +960,33 @@ class AboutPanel(NSPanel):
         self.makeKeyAndOrderFront_(None)
 
 
-class AddHostPanel(ConnectionFieldPanel):
+class AddConnectionPanel(GenericFieldPanel):
+
+    def add_(self, _):
+        tag = self.tag.stringValue().strip()
+        host = self.host.stringValue().strip()
+        socks_proxy_port = self.socks_proxy_port.stringValue().strip()
+
+        if not self.check_empty(tag, "Connection Tag"):
+            return
+
+        if not self.check_empty(host, "SSH Host"):
+            return
+
+        if not self.check_port_range(socks_proxy_port, "SOCKS Proxy Port"):
+            return
+
+        cmd = f"add-connection {tag} {host} {socks_proxy_port}"
+        output, returncode = susops_app.run_susops(cmd)
+        if returncode == 0:
+            alert_foreground("Success", output)
+            self.close()
+            self.tag.setStringValue_("")
+            self.host.setStringValue_("")
+            self.socks_proxy_port.setStringValue_("")
+
+
+class AddHostPanel(GenericFieldPanel):
 
     def add_top_label(self, text, frame_width, frame_height):
         width = frame_width - 15 * 2
@@ -990,7 +1016,7 @@ class AddHostPanel(ConnectionFieldPanel):
             self.host.setStringValue_("")
 
 
-class LocalForwardPanel(ConnectionFieldPanel):
+class LocalForwardPanel(GenericFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
 
@@ -1010,7 +1036,7 @@ class LocalForwardPanel(ConnectionFieldPanel):
             self.local_port_field.setStringValue_("")
 
 
-class RemoteForwardPanel(ConnectionFieldPanel):
+class RemoteForwardPanel(GenericFieldPanel):
     def add_(self, _):
         connection = self.connection.selectedItem().title()
 
