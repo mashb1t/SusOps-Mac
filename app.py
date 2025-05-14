@@ -65,6 +65,12 @@ def alert_foreground(title, message, ok=None, cancel=None, other=None, icon_path
     return rumps.alert(title, message, ok, cancel, other, icon_path)
 
 
+def bring_app_to_front(self):
+    NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+    self.center()
+    self.makeKeyAndOrderFront_(None)
+
+
 def resource_path(rel_path):
     # on macOS bundle, resources are in Contents/Resources
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -300,7 +306,6 @@ class SusOpsApp(rumps.App):
         return configs
 
     def open_settings(self, _):
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         if self._settings_panel is None:
             frame = NSMakeRect(0, 0, 310, 250)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
@@ -758,9 +763,7 @@ class SettingsPanel(NSPanel):
         self.close()
 
     def run(self):
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-        self.center()
-        self.makeKeyAndOrderFront_(None)
+        bring_app_to_front(self)
         add_edit_menu()
 
 
@@ -860,9 +863,7 @@ class GenericFieldPanel(NSPanel):
         return True
 
     def run(self):
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-        self.center()
-        self.makeKeyAndOrderFront_(None)
+        bring_app_to_front(self)
         add_edit_menu()
         # reload connection tags
         if hasattr(self, 'connection'):
@@ -992,9 +993,7 @@ class AboutPanel(NSPanel):
         return self
 
     def run(self):
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-        self.center()
-        self.makeKeyAndOrderFront_(None)
+        bring_app_to_front(self)
 
 
 class AddConnectionPanel(GenericFieldPanel):
