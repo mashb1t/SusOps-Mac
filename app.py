@@ -18,7 +18,7 @@ from Cocoa import (
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
     NSForegroundColorAttributeName, NSColor, NSOnState, NSOffState,
     NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown,
-    NSSwitchButton, NSPopUpButton
+    NSSwitchButton, NSPopUpButton, NSMenu, NSMenuItem
 )
 from Foundation import NSBundle, NSData, NSDictionary
 
@@ -110,6 +110,33 @@ def add_bin_to_path():
 susops_app = None  # type: SusOpsApp|None
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
+
+def add_edit_menu():
+    app = NSApplication.sharedApplication()
+    main_menu = app.mainMenu()
+
+    if main_menu is None:
+        main_menu = NSMenu.alloc().init()
+        app.setMainMenu_(main_menu)
+
+    # only initialize once
+    if main_menu.itemWithTitle_("Edit") is not None:
+        return
+
+    edit_menu = NSMenu.alloc().initWithTitle_("Edit")
+    edit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Edit", None, "")
+    edit_item.setSubmenu_(edit_menu)
+
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Undo", "undo:", "z"))
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Redo", "redo:", "Z"))
+    edit_menu.addItem_(NSMenuItem.separatorItem())
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Cut", "cut:", "x"))
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Copy", "copy:", "c"))
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Paste", "paste:", "v"))
+    edit_menu.addItem_(NSMenuItem.separatorItem())
+    edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Select All", "selectAll:", "a"))
+
+    main_menu.addItem_(edit_item)
 
 class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
@@ -734,6 +761,7 @@ class SettingsPanel(NSPanel):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         self.center()
         self.makeKeyAndOrderFront_(None)
+        add_edit_menu()
 
 
 class GenericFieldPanel(NSPanel):
@@ -835,6 +863,7 @@ class GenericFieldPanel(NSPanel):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         self.center()
         self.makeKeyAndOrderFront_(None)
+        add_edit_menu()
 
     def cancel_(self, _):
         self.close()
