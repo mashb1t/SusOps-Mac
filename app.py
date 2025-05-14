@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 from enum import Enum
@@ -65,7 +66,7 @@ def alert_foreground(title, message, ok=None, cancel=None, other=None, icon_path
     return rumps.alert(title, message, ok, cancel, other, icon_path)
 
 
-def bring_app_to_front(self):
+def bring_app_to_front(self: NSPanel):
     NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
     self.center()
     self.makeKeyAndOrderFront_(None)
@@ -81,6 +82,36 @@ def resource_path(rel_path):
     return os.path.join(base, rel_path)
 
 
+class FormValidator:
+    @staticmethod
+    # def validate_ip(ip: str) -> bool:
+    #     parts = ip.split('.')
+    #     if len(parts) != 4:
+    #         return False
+    #     for part in parts:
+    #         if not part.isdigit() or not (0 <= int(part) <= 255):
+    #             return False
+    #     return True
+
+    @staticmethod
+    def validate_port(port) -> bool:
+        return port.isdigit() and 1 <= int(port) <= 65535
+
+    @staticmethod
+    def validate_port_with_alert(port, label: str):
+        if not FormValidator.validate_port(port):
+            alert_foreground("Error", f"{label} must be a valid port between 1 and 65535")
+            return False
+        return True
+
+    @staticmethod
+    def validate_empty_with_alert(value, label):
+        if not value:
+            alert_foreground("Error", f"{label} must not be empty")
+            return False
+        return True
+
+
 class ConfigHelper:
     yq_path = resource_path(os.path.join('bin', 'yq'))
     workspace_path = os.path.expanduser("~/.susops")
@@ -88,13 +119,31 @@ class ConfigHelper:
 
     @staticmethod
     def get_connection_tags():
-        result = subprocess.check_output([ConfigHelper.yq_path, "e", ".connections[].tag", ConfigHelper.config_path], encoding="utf-8").strip()
-        if result == "null":
-            return []
+        result = ConfigHelper.read_config(".connections[].tag", [])
         return result.splitlines()
 
     @staticmethod
-    def read_config(query: str, default: str):
+    def get_domains():
+        result = ConfigHelper.read_config(".connections[].pac_hosts", [])
+        split_result = result.splitlines()
+        split_result = [item.lstrip("- ").strip() for item in split_result]
+        return split_result
+
+    @staticmethod
+    def get_local_forwards():
+        result = ConfigHelper.read_config(".connections[].forwards.local[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
+        # filter result items, remove all items equal to "'( → )'"
+        result = [item for item in result.splitlines() if not item == "( → )"]
+        return result
+
+    def get_remote_forwards():
+        result = ConfigHelper.read_config(".connections[].forwards.remote[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
+        # filter result items, remove all items equal to "'( → )'"
+        result = [item for item in result.splitlines() if not item == "( → )"]
+        return result
+
+    @staticmethod
+    def read_config(query: str, default):
         try:
             result = subprocess.check_output([ConfigHelper.yq_path, "e", query, ConfigHelper.config_path], encoding="utf-8").strip()
             if result == "null" or result == "0":
@@ -110,6 +159,14 @@ class ConfigHelper:
 
 def add_bin_to_path():
     os.environ['PATH'] = resource_path('bin') + os.pathsep + os.environ.get('PATH', '')
+
+
+def run_susops(command, show_alert=True):
+    result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
+                            errors="ignore")
+    if result.returncode != 0 and show_alert:
+        alert_foreground("Error", result.stdout.strip())
+    return result.stdout.strip(), result.returncode
 
 
 # Global instance of the app
@@ -176,9 +233,13 @@ class SusOpsApp(rumps.App):
 
         self._settings_panel = None
         self._connection_panel = None
-        self._host_panel = None
-        self._local_panel = None
-        self._remote_panel = None
+        self._remove_connection_panel = None
+        self._add_host_panel = None
+        self._remove_host_panel = None
+        self._add_local_forward_panel = None
+        self._remove_local_forward_panel = None
+        self._add_remote_forward_panel = None
+        self._remove_remote_forward_panel = None
         self._about_panel = None
 
         self.menu = [
@@ -231,7 +292,7 @@ class SusOpsApp(rumps.App):
     def timer_check_state(self, _=None):
         # runs every 5s
         try:
-            output, returncode = self.run_susops("ps", False)
+            output, returncode = run_susops("ps", False)
         except subprocess.CalledProcessError:
             output, returncode = "Error running command", -1
 
@@ -283,14 +344,6 @@ class SusOpsApp(rumps.App):
         self.icon = get_logo_style_image(logo_style, state)
 
     @staticmethod
-    def run_susops(command, show_alert=True):
-        result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
-                                errors="ignore")
-        if result.returncode != 0 and show_alert:
-            alert_foreground("Error", result.stdout.strip())
-        return result.stdout.strip(), result.returncode
-
-    @staticmethod
     def load_config():
         configs = {
             "pac_server_port": ConfigHelper.read_config(".pac_server_port", "1081"),
@@ -313,7 +366,7 @@ class SusOpsApp(rumps.App):
                 frame, style, NSBackingStoreBuffered, False
             )
         self.config = self.load_config()
-        self._settings_panel.pac_field.setStringValue_(self.config['pac_server_port'])
+        self._settings_panel.pac_port_field.setStringValue_(self.config['pac_server_port'])
 
         app_path = os.path.basename(NSBundle.mainBundle().bundlePath())
         app_name = os.path.splitext(os.path.basename(app_path))[0]
@@ -368,135 +421,103 @@ class SusOpsApp(rumps.App):
     def add_domain(self, sender, default_text=''):
         frame_width = 280
         frame_height = 195
-        if not self._host_panel:
+        if not self._add_host_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-            self._host_panel = AddHostPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._add_host_panel = AddHostPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._host_panel.setTitle_("Add Domain")
-            self._host_panel.configure_fields([
+            self._add_host_panel.setTitle_("Add Domain")
+            self._add_host_panel.configure_fields([
                 ('host', "Domain:"),
             ], label_width=80, input_start_x=100)
-            self._host_panel.add_info_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
-        self._host_panel.run()
+            self._add_host_panel.add_info_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
+        self._add_host_panel.run()
 
     def add_local_forward(self, _):
-        if not self._local_panel:
+        if not self._add_local_forward_panel:
             frame = NSMakeRect(0, 0, 350, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-            self._local_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._add_local_forward_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._local_panel.setTitle_("Add Local Forward")
-            self._local_panel.configure_fields([
+            self._add_local_forward_panel.setTitle_("Add Local Forward")
+            self._add_local_forward_panel.configure_fields([
                 ('tag', 'Tag (optional):'),
                 ('remote_port_field', 'Make Remote Port:'),
                 ('local_port_field', 'Available on Local Port:'),
             ])
-        self._local_panel.run()
+        self._add_local_forward_panel.run()
 
     def add_remote_forward(self, _):
-        if not self._remote_panel:
+        if not self._add_remote_forward_panel:
             frame = NSMakeRect(0, 0, 350, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-            self._remote_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+            self._add_remote_forward_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._remote_panel.setTitle_("Add Remote Forward")
-            self._remote_panel.configure_fields([
+            self._add_remote_forward_panel.setTitle_("Add Remote Forward")
+            self._add_remote_forward_panel.configure_fields([
                 ('tag', 'Tag (optional):'),
                 ('local_port_field', 'Make Local Port:'),
                 ('remote_port_field', 'Available on Remote Port:'),
             ])
-        self._remote_panel.run()
+        self._add_remote_forward_panel.run()
 
-    def remove_connection(self, sender, default_text=''):
-        result = rumps.Window("Enter connection to remove:",
-                              "Remove Connection", default_text, "Remove", "Cancel", (220, 20)).run()
+    def remove_connection(self, _):
+        if not self._remove_connection_panel:
+            frame = NSMakeRect(0, 0, 300, 105)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+            self._remove_connection_panel = RemoveConnectionPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._remove_connection_panel.setTitle_("Remove Connection")
+            self._remove_connection_panel.configure_field("Connection Tag:", label_width = 100, input_start_x = 120)
+        self._remove_connection_panel.update_items(ConfigHelper.get_connection_tags())
+        self._remove_connection_panel.run()
 
-        if result.clicked == 0:
-            return
-
-        connection = result.text.strip()
-        if not connection:
-            alert_foreground("Error", "Connection cannot be empty")
-            self.remove_domain(sender)
-            return
-
-        output, returncode = self.run_susops(f"rm-connection {connection}")
-        if returncode != 0:
-            alert_foreground("Success", output)
-            return self.remove_domain(sender, connection)
-        else:
-            self.show_restart_dialog("Success", output)
-
-    def remove_domain(self, sender, default_text=''):
-        result = rumps.Window("Enter domain to remove (without protocol):",
-                              "Remove Domain", default_text, "Remove", "Cancel", (220, 20)).run()
-
-        if result.clicked == 0:
-            return
-
-        host = result.text.strip()
-        if not host:
-            alert_foreground("Error", "Domain cannot be empty")
-            self.remove_domain(sender)
-            return
-
-        output, returncode = self.run_susops(f"rm {host}")
-        if returncode != 0:
-            alert_foreground("Success", output)
-            return self.remove_domain(sender, host)
-        else:
-            self.show_restart_dialog("Success", output)
+    def remove_domain(self, _):
+        if not self._remove_host_panel:
+            frame = NSMakeRect(0, 0, 255, 105)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+            self._remove_host_panel = RemoveDomainPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._remove_host_panel.setTitle_("Remove Domain")
+            self._remove_host_panel.configure_field("Domain:", label_width = 55, input_start_x = 75)
+        self._remove_host_panel.update_items(ConfigHelper.get_domains())
+        self._remove_host_panel.run()
 
     def remove_local_forward(self, sender, default_text=''):
-        result = rumps.Window("Enter port to remove:", "Remove Local Forward",
-                              default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
-
-        if result.clicked == 0:
-            return
-
-        port = result.text.strip()
-
-        if not port:
-            alert_foreground("Error", "Port cannot be empty")
-            self.remove_local_forward(sender)
-            return
-
-        output, returncode = self.run_susops(f"rm -l {port}")
-        if returncode != 0:
-            return self.remove_local_forward(sender, port)
-        else:
-            self.show_restart_dialog("Success", output)
+        if not self._remove_local_forward_panel:
+            frame = NSMakeRect(0, 0, 290, 105)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+            self._remove_local_forward_panel = RemoveLocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._remove_local_forward_panel.setTitle_("Remove Local Forward")
+            self._remove_local_forward_panel.configure_field("Local Forward:", label_width=90, input_start_x=110)
+        self._remove_local_forward_panel.update_items(ConfigHelper.get_local_forwards())
+        self._remove_local_forward_panel.run()
 
     def remove_remote_forward(self, sender, default_text=''):
-        result = rumps.Window("Enter port to remove:", "Remove Remote Forward",
-                              default_text, ok="Remove", cancel="Cancel", dimensions=(220, 20)).run()
-
-        if result.clicked == 0:
-            return
-
-        port = result.text.strip()
-
-        if not port:
-            alert_foreground("Error", "Port cannot be empty")
-            self.remove_remote_forward(sender)
-            return
-
-        output, returncode = self.run_susops(f"rm -r {port}")
-        if returncode != 0:
-            return self.remove_remote_forward(sender, port)
-        else:
-            self.show_restart_dialog("Success", output)
+        if not self._remove_remote_forward_panel:
+            frame = NSMakeRect(0, 0, 310, 105)
+            style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+            self._remove_remote_forward_panel = RemoveRemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, NSBackingStoreBuffered, False
+            )
+            self._remove_remote_forward_panel.setTitle_("Remove Remote Forward")
+            self._remove_remote_forward_panel.configure_field("Remote Forward:", label_width=110, input_start_x=130)
+        self._remove_remote_forward_panel.update_items(ConfigHelper.get_remote_forwards())
+        self._remove_remote_forward_panel.run()
 
     def list_config(self, _):
-        output, _ = self.run_susops("ls")
+        output, _ = run_susops("ls")
         alert_foreground("Domains & Forwards", output)
 
     def open_config_file(self, _):
-        self.run_susops("config")
+        run_susops("config")
 
     def start_proxy(self, _):
         """Start the proxy in a fully detached background session using setsid."""
@@ -518,37 +539,37 @@ class SusOpsApp(rumps.App):
     def stop_proxy(self, _):
         ports_flag = "--keep-ports" if not self.config['ephemeral_ports'] else ""
 
-        output, _ = self.run_susops(f"stop {ports_flag}")
+        output, _ = run_susops(f"stop {ports_flag}")
         self.timer_check_state()
 
     def restart_proxy(self, _):
         self.config = self.load_config()
-        output, _ = self.run_susops("restart")
+        output, _ = run_susops("restart")
         self.timer_check_state()
 
     def check_status(self, _):
-        output, _ = self.run_susops("ps", False)
+        output, _ = run_susops("ps", False)
         alert_foreground("SusOps Status", output)
 
     def test_any(self, _):
         host = rumps.Window("Enter domain or port to test: ", "Test Any",
                             ok="Test", cancel="Cancel", dimensions=(220, 20)).run().text
         if host:
-            output, _ = self.run_susops(f"test {host}", False)
+            output, _ = run_susops(f"test {host}", False)
             alert_foreground("SusOps Test", output)
 
     def test_all(self, _):
-        output, _ = self.run_susops("test --all", False)
+        output, _ = run_susops("test --all", False)
         alert_foreground("SusOps Test All", output)
 
     def launch_chrome(self, _):
-        output, _ = self.run_susops("chrome", False)
+        output, _ = run_susops("chrome", False)
 
     def launch_chrome_proxy_settings(self, _):
-        output, _ = self.run_susops("chrome-proxy-settings", False)
+        output, _ = run_susops("chrome-proxy-settings", False)
 
     def launch_firefox(self, _):
-        output, _ = self.run_susops("firefox", False)
+        output, _ = run_susops("firefox", False)
 
     def reset(self, _):
         result = alert_foreground(
@@ -558,7 +579,7 @@ class SusOpsApp(rumps.App):
         )
 
         if result == 1:
-            self.run_susops("reset --force", False)
+            run_susops("reset --force", False)
             self.config = self.load_config()
             self.update_icon()
 
@@ -573,7 +594,7 @@ class SusOpsApp(rumps.App):
 
     def quit_app(self, _):
         if self.config['stop_on_quit']:
-            self.run_susops("stop --keep-ports", False)
+            run_susops("stop --keep-ports", False)
         rumps.quit_application()
 
 
@@ -660,8 +681,8 @@ class SettingsPanel(NSPanel):
         self.pac_label.setEditable_(False)
         content.addSubview_(self.pac_label)
 
-        self.pac_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
-        content.addSubview_(self.pac_field)
+        self.pac_port_field = NSTextField.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
+        content.addSubview_(self.pac_port_field)
 
         # --- Save/Cancel Buttons ---
         button_x = input_margin_left - 5
@@ -700,21 +721,18 @@ class SettingsPanel(NSPanel):
         ws = os.path.expanduser("~/.susops")
         os.makedirs(ws, exist_ok=True)
 
-        pac_server_port = self.pac_field.stringValue().strip()
-        if not pac_server_port:
-            alert_foreground("Error", f"Field {self.pac_label.stringValue().rstrip(':')} cannot be empty")
+        pac_server_port = self.pac_port_field.stringValue().strip()
+        if not FormValidator.validate_port_with_alert(pac_server_port, self.pac_label.stringValue().rstrip(':')):
             return
         ConfigHelper.update_config(f".pac_server_port = {pac_server_port}")
 
         stop_on_quit = self.stop_on_quit_checkbox.stringValue().strip()
-        if not stop_on_quit:
-            alert_foreground("Error", f"Field {self.stop_on_quit_checkbox.stringValue().rstrip(':')} cannot be empty")
+        if not FormValidator.validate_empty_with_alert(stop_on_quit, self.stop_on_quit_checkbox.stringValue().rstrip(':')):
             return
         ConfigHelper.update_config(f".susops_app.stop_on_quit = \"{stop_on_quit}\"")
 
         ephemeral_ports = self.ephemeral_ports_checkbox.stringValue().strip()
-        if not ephemeral_ports:
-            alert_foreground("Error", f"Field {self.ephemeral_ports.stringValue().rstrip(':')} cannot be empty")
+        if not FormValidator.validate_empty_with_alert(ephemeral_ports, self.ephemeral_ports_checkbox.stringValue().rstrip(':')):
             return
         ConfigHelper.update_config(f".susops_app.ephemeral_ports = \"{ephemeral_ports}\"")
 
@@ -790,13 +808,6 @@ class GenericFieldPanel(NSPanel):
         field_defs = [(attr_name, label_text), ...]   # order = top → bottom
         Builds one label/field row per entry, 40 px vertical spacing.
         """
-        # purge any old dynamic subviews (labels / text-fields)
-        for view in list(self.contentView().subviews()):
-            if isinstance(view, NSTextField) and view.isEditable():
-                view.removeFromSuperview()
-            elif isinstance(view, NSTextField) and not view.isEditable():
-                if view.stringValue().endswith(':'):
-                    view.removeFromSuperview()
 
         content = self.contentView()
 
@@ -820,7 +831,7 @@ class GenericFieldPanel(NSPanel):
         y -= 40
 
         for attr, label in field_defs:
-            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 4, label_width, 24))
+            lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
             lbl.setStringValue_(label)
             lbl.setAlignment_(2)
             lbl.setBezeled_(False)
@@ -850,20 +861,6 @@ class GenericFieldPanel(NSPanel):
         add_btn.setAction_("add:")
         content.addSubview_(add_btn)
 
-    @staticmethod
-    def check_port_range(port, label):
-        if not port.isdigit() or not (1 <= int(port) <= 65535):
-            alert_foreground("Error", f"{label} must be a valid port between 1 and 65535")
-            return False
-        return True
-
-    @staticmethod
-    def check_empty(value, label):
-        if not value:
-            alert_foreground("Error", f"{label} must not be empty")
-            return False
-        return True
-
     def run(self):
         bring_app_to_front(self)
         add_edit_menu_item()
@@ -874,6 +871,124 @@ class GenericFieldPanel(NSPanel):
 
     def cancel_(self, _):
         self.close()
+
+
+class GenericSelectPanel(NSPanel):
+    """A simple panel with a label, a dropdown, and Save/Cancel buttons."""
+
+    def initWithContentRect_styleMask_backing_defer_(
+            self, frame, style, backing, defer
+    ):
+        self = objc.super(GenericSelectPanel, self).initWithContentRect_styleMask_backing_defer_(
+            frame, style, backing, defer
+        )
+        if not self:
+            return None
+
+        self.setHidesOnDeactivate_(False)
+        self.setLevel_(NSFloatingWindowLevel)
+
+        return self
+
+    def configure_field(self, label_text: str, label_width: int = 100, input_start_x: int = 120, input_width: int = 150, save_button_text: str = "Remove"):
+        """
+        Configures the panel with a single label and NSPopUpButton.
+        :param label_text: The text for the label.
+        :param label_width: Width of the label.
+        :param input_start_x: X-coordinate for the NSPopUpButton.
+        :param input_width: Width of the NSPopUpButton.
+        """
+        content = self.contentView()
+
+        # Label
+        y = 40 + 16
+        label = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
+        label.setStringValue_(label_text)
+        label.setAlignment_(2)
+        label.setBezeled_(False)
+        label.setDrawsBackground_(False)
+        label.setEditable_(False)
+        content.addSubview_(label)
+        self.label = label
+
+        # NSPopUpButton
+        select = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
+        select.setPullsDown_(False)
+        # select.addItemsWithTitles_(options)
+        select.selectItemAtIndex_(0)
+        content.addSubview_(select)
+        self.select = select
+
+        # Save/Cancel Buttons
+        x = input_start_x - 5
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x, 18, 80, 30))
+        cancel_btn.setTitle_("Cancel")
+        cancel_btn.setBezelStyle_(1)
+        cancel_btn.setTarget_(self)
+        cancel_btn.setAction_("cancel:")
+        content.addSubview_(cancel_btn)
+
+        save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x + 90, 18, 80, 30))
+        save_btn.setTitle_(save_button_text)
+        save_btn.setBezelStyle_(1)
+        save_btn.setKeyEquivalent_("\r")
+        save_btn.setTarget_(self)
+        save_btn.setAction_("save:")
+        content.addSubview_(save_btn)
+
+    def update_items(self, items: list):
+        """Update the items in the NSPopUpButton."""
+        self.select.removeAllItems()
+        self.select.addItemsWithTitles_(items)
+        self.select.selectItemAtIndex_(0)
+
+    def run(self):
+        bring_app_to_front(self)
+        add_edit_menu_item()
+
+    def cancel_(self, _):
+        self.close()
+
+    def get_command(self, value: str):
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def save_(self, _):
+        value = self.select.selectedItem().title()
+        if not FormValidator.validate_empty_with_alert(value, self.label.stringValue().rstrip(':')):
+            return
+
+        output, returncode = run_susops(self.get_command(value))
+        if returncode == 0:
+            alert_foreground("Success", output)
+            self.close()
+
+
+class RemoveConnectionPanel(GenericSelectPanel):
+    def get_command(self, value: str):
+        return f"rm-connection {value}"
+
+
+class RemoveDomainPanel(GenericSelectPanel):
+    def get_command(self, value: str):
+        return f"rm {value}"
+
+
+class RemoveLocalForwardPanel(GenericSelectPanel):
+    def get_command(self, value: str):
+        # match by src
+        pattern = r"\((\d+)\s"
+        match = re.search(pattern, value)
+        src = match.groups(1)[0]
+        return f"rm -l {src}"
+
+
+class RemoveRemoteForwardPanel(GenericSelectPanel):
+    def get_command(self, value: str):
+        # match by src
+        pattern = r"\((\d+)\s"
+        match = re.search(pattern, value)
+        src = match.groups(1)[0]
+        return f"rm -r {src}"
 
 
 class AboutPanel(NSPanel):
@@ -1005,17 +1120,17 @@ class AddConnectionPanel(GenericFieldPanel):
         host = self.host.stringValue().strip()
         socks_proxy_port = self.socks_proxy_port.stringValue().strip()
 
-        if not self.check_empty(tag, "Connection Tag"):
+        if not FormValidator.validate_empty_with_alert(tag, "Connection Tag"):
             return
 
-        if not self.check_empty(host, "SSH Host"):
+        if not FormValidator.validate_empty_with_alert(host, "SSH Host"):
             return
 
-        if not self.check_port_range(socks_proxy_port, "SOCKS Proxy Port"):
+        if not FormValidator.validate_port_with_alert(socks_proxy_port, "SOCKS Proxy Port"):
             return
 
         cmd = f"add-connection {tag} {host} {socks_proxy_port}"
-        output, returncode = susops_app.run_susops(cmd)
+        output, returncode = run_susops(cmd)
         if returncode == 0:
             alert_foreground("Success", output)
             self.close()
@@ -1042,11 +1157,11 @@ class AddHostPanel(GenericFieldPanel):
         connection = self.connection.selectedItem().title()
         host = self.host.stringValue().strip()
 
-        if not self.check_empty(host, "Host"):
+        if not FormValidator.validate_empty_with_alert(host, "Host"):
             return
 
         cmd = f"-c {connection} add {host}"
-        output, returncode = susops_app.run_susops(cmd)
+        output, returncode = run_susops(cmd)
         if returncode == 0:
             alert_foreground("Success", output + "\nPlease re-apply your browser proxy settings.")
             self.close()
@@ -1060,14 +1175,14 @@ class LocalForwardPanel(GenericFieldPanel):
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
 
-        if not self.check_port_range(remote_port, "Remote Port"):
+        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
-        if not self.check_port_range(local_port, "Local Port"):
+        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
-        cmd = f"-c {connection} add -l {local_port} {remote_port} {tag}"
-        output, returncode = susops_app.run_susops(cmd)
+        cmd = f"-c {connection} add -l {local_port} {remote_port} \"{tag}\""
+        output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
@@ -1084,14 +1199,14 @@ class RemoteForwardPanel(GenericFieldPanel):
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
 
-        if not self.check_port_range(local_port, "Local Port"):
+        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
-        if not self.check_port_range(remote_port, "Remote Port"):
+        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
-        output, returncode = susops_app.run_susops(cmd)
-        cmd = f"-c {connection} add -r {remote_port} {local_port} {tag}"
+        cmd = f"-c {connection} add -r {remote_port} {local_port} \"{tag}\""
+        output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
