@@ -175,8 +175,6 @@ class SusOpsApp(rumps.App):
         self._remote_panel = None
         self._about_panel = None
 
-        self.connections = []
-
         self.menu = [
             rumps.MenuItem("Status", callback=self.check_status),
             None,
@@ -586,6 +584,8 @@ class SettingsPanel(NSPanel):
         if not self:
             return None
 
+        self.setHidesOnDeactivate_(False)
+
         self.setTitle_("Settings")
         self.setLevel_(NSFloatingWindowLevel)
         content = self.contentView()
@@ -775,6 +775,7 @@ class GenericFieldPanel(NSPanel):
         if not self:
             return None
 
+        self.setHidesOnDeactivate_(False)
         self.setLevel_(NSFloatingWindowLevel)
 
         return self
@@ -884,6 +885,8 @@ class AboutPanel(NSPanel):
         )
         if not self:
             return None
+
+        self.setHidesOnDeactivate_(False)
 
         # window styling
         self.setTitle_("")
