@@ -1090,8 +1090,8 @@ class RemoteForwardPanel(GenericFieldPanel):
         if not self.check_port_range(remote_port, "Remote Port"):
             return
 
-        cmd = f"-c {connection} add -l {remote_port} {local_port} {tag}"
         output, returncode = susops_app.run_susops(cmd)
+        cmd = f"-c {connection} add -r {remote_port} {local_port} {tag}"
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
             self.close()
