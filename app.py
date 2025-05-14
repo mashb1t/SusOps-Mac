@@ -117,7 +117,7 @@ susops_app = None  # type: SusOpsApp|None
 script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
-def add_edit_menu():
+def add_edit_menu_item():
     app = NSApplication.sharedApplication()
     main_menu = app.mainMenu()
 
@@ -765,7 +765,7 @@ class SettingsPanel(NSPanel):
 
     def run(self):
         bring_app_to_front(self)
-        add_edit_menu()
+        add_edit_menu_item()
 
 
 class GenericFieldPanel(NSPanel):
@@ -866,7 +866,7 @@ class GenericFieldPanel(NSPanel):
 
     def run(self):
         bring_app_to_front(self)
-        add_edit_menu()
+        add_edit_menu_item()
         # reload connection tags
         if hasattr(self, 'connection'):
             self.connection.removeAllItems()
