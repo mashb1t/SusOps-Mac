@@ -436,7 +436,7 @@ class SusOpsApp(rumps.App):
 
     def add_local_forward(self, _):
         if not self._add_local_forward_panel:
-            frame = NSMakeRect(0, 0, 350, 230)
+            frame = NSMakeRect(0, 0, 320, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._add_local_forward_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -444,14 +444,14 @@ class SusOpsApp(rumps.App):
             self._add_local_forward_panel.setTitle_("Add Local Forward")
             self._add_local_forward_panel.configure_fields([
                 ('tag', 'Tag (optional):'),
-                ('remote_port_field', 'Make Remote Port:'),
-                ('local_port_field', 'Available on Local Port:'),
-            ])
+                ('local_port_field', 'Forward Local Port:'),
+                ('remote_port_field', 'To Remote Port:'),
+            ], label_width=120, input_start_x=140)
         self._add_local_forward_panel.run()
 
     def add_remote_forward(self, _):
         if not self._add_remote_forward_panel:
-            frame = NSMakeRect(0, 0, 350, 230)
+            frame = NSMakeRect(0, 0, 330, 230)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._add_remote_forward_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -459,9 +459,9 @@ class SusOpsApp(rumps.App):
             self._add_remote_forward_panel.setTitle_("Add Remote Forward")
             self._add_remote_forward_panel.configure_fields([
                 ('tag', 'Tag (optional):'),
-                ('local_port_field', 'Make Local Port:'),
-                ('remote_port_field', 'Available on Remote Port:'),
-            ])
+                ('remote_port_field', 'Forward Remote Port:'),
+                ('local_port_field', 'To Local Port:'),
+            ], label_width=130, input_start_x=150)
         self._add_remote_forward_panel.run()
 
     def remove_connection(self, _):
@@ -1175,10 +1175,10 @@ class LocalForwardPanel(GenericFieldPanel):
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
 
-        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
+        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
-        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
+        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
         cmd = f"-c {connection} add -l {local_port} {remote_port} \"{tag}\""
@@ -1199,10 +1199,10 @@ class RemoteForwardPanel(GenericFieldPanel):
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
 
-        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
+        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
-        if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
+        if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
         cmd = f"-c {connection} add -r {remote_port} {local_port} \"{tag}\""
