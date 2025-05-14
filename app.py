@@ -807,12 +807,11 @@ class GenericFieldPanel(NSPanel):
             lbl.setEditable_(False)
             content.addSubview_(lbl)
 
-            popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
-            popup.setPullsDown_(False)
-            popup.addItemsWithTitles_(ConfigHelper.get_connection_tags())
-            popup.selectItemAtIndex_(0)
-            content.addSubview_(popup)
-            setattr(self, 'connection', popup)
+            self.connection = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
+            self.connection.setPullsDown_(False)
+            self.connection.addItemsWithTitles_(ConfigHelper.get_connection_tags())
+            self.connection.selectItemAtIndex_(0)
+            content.addSubview_(self.connection)
         y -= 40
 
         for attr, label in field_defs:
@@ -864,6 +863,10 @@ class GenericFieldPanel(NSPanel):
         self.center()
         self.makeKeyAndOrderFront_(None)
         add_edit_menu()
+        # reload connection tags
+        if hasattr(self, 'connection'):
+            self.connection.removeAllItems()
+            self.connection.addItemsWithTitles_(ConfigHelper.get_connection_tags())
 
     def cancel_(self, _):
         self.close()
