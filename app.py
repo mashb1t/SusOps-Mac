@@ -360,7 +360,7 @@ class SusOpsApp(rumps.App):
 
     def open_settings(self, _):
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 310, 250)
+            frame = NSMakeRect(0, 0, 300, 250)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -402,8 +402,8 @@ class SusOpsApp(rumps.App):
             self.restart_proxy(None)
 
     def add_connection(self, sender, default_text=''):
-        frame_width = 320
-        frame_height = 185
+        frame_width = 360
+        frame_height = 195
         if not self._connection_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
@@ -414,8 +414,8 @@ class SusOpsApp(rumps.App):
             self._connection_panel.configure_fields([
                 ('tag', "Connection Tag:"),
                 ('host', "SSH Host:"),
-                ('socks_proxy_port', "SOCKS Proxy Port:"),
-            ], label_width=120, input_start_x=140, hide_connection=True)
+                ('socks_proxy_port', "SOCKS Proxy Port (optional):"),
+            ], label_width=170, input_start_x=190, hide_connection=True)
         self._connection_panel.run()
 
     def add_domain(self, sender, default_text=''):
@@ -617,8 +617,8 @@ class SettingsPanel(NSPanel):
         content = self.contentView()
         win_h = frame.size.height
         label_margin_left = 20
-        label_width = 80
-        input_margin_left = 110
+        label_width = 70
+        input_margin_left = 100
         input_width = 180
         element_height = 24
 
@@ -953,7 +953,8 @@ class GenericSelectPanel(NSPanel):
         raise NotImplementedError("Subclasses must implement this method.")
 
     def save_(self, _):
-        value = self.select.selectedItem().title()
+        selectedItem = self.select.selectedItem()
+        value = selectedItem.title() if selectedItem else None
         if not FormValidator.validate_empty_with_alert(value, self.label.stringValue().rstrip(':')):
             return
 
@@ -1126,7 +1127,8 @@ class AddConnectionPanel(GenericFieldPanel):
         if not FormValidator.validate_empty_with_alert(host, "SSH Host"):
             return
 
-        if not FormValidator.validate_port_with_alert(socks_proxy_port, "SOCKS Proxy Port"):
+        # socks_proxy_port will be randomized on proxy start if empty
+        if socks_proxy_port and not FormValidator.validate_port_with_alert(socks_proxy_port, "SOCKS Proxy Port"):
             return
 
         cmd = f"add-connection {tag} {host} {socks_proxy_port}"
@@ -1154,8 +1156,12 @@ class AddHostPanel(GenericFieldPanel):
         self.contentView().addSubview_(label)
 
     def add_(self, _):
-        connection = self.connection.selectedItem().title()
+        connection_item = self.connection.selectedItem()
+        connection = connection_item.title() if connection_item else None
         host = self.host.stringValue().strip()
+
+        if not FormValidator.validate_empty_with_alert(connection, "Connection"):
+            return
 
         if not FormValidator.validate_empty_with_alert(host, "Host"):
             return
@@ -1170,10 +1176,15 @@ class AddHostPanel(GenericFieldPanel):
 
 class LocalForwardPanel(GenericFieldPanel):
     def add_(self, _):
-        connection = self.connection.selectedItem().title()
+
+        connection_item = self.connection.selectedItem()
+        connection = connection_item.title() if connection_item else None
         tag = self.tag.stringValue().strip()
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
+
+        if not FormValidator.validate_empty_with_alert(connection, "Connection"):
+            return
 
         if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
