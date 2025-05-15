@@ -1131,7 +1131,7 @@ class AddConnectionPanel(GenericFieldPanel):
         if socks_proxy_port and not FormValidator.validate_port_with_alert(socks_proxy_port, "SOCKS Proxy Port"):
             return
 
-        cmd = f"add-connection {tag} {host} {socks_proxy_port}"
+        cmd = f"add-connection \"{tag}\" {host} {socks_proxy_port}"
         output, returncode = run_susops(cmd)
         if returncode == 0:
             alert_foreground("Success", output)
@@ -1166,7 +1166,7 @@ class AddHostPanel(GenericFieldPanel):
         if not FormValidator.validate_empty_with_alert(host, "Host"):
             return
 
-        cmd = f"-c {connection} add {host}"
+        cmd = f"-c \"{connection}\" add {host}"
         output, returncode = run_susops(cmd)
         if returncode == 0:
             alert_foreground("Success", output + "\nPlease re-apply your browser proxy settings.")
@@ -1192,7 +1192,7 @@ class LocalForwardPanel(GenericFieldPanel):
         if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
-        cmd = f"-c {connection} add -l {local_port} {remote_port} \"{tag}\""
+        cmd = f"-c \"{connection}\" add -l {local_port} {remote_port} \"{tag}\""
         output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
@@ -1216,7 +1216,7 @@ class RemoteForwardPanel(GenericFieldPanel):
         if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
-        cmd = f"-c {connection} add -r {remote_port} {local_port} \"{tag}\""
+        cmd = f"-c \"{connection}\" add -r {remote_port} {local_port} \"{tag}\""
         output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
