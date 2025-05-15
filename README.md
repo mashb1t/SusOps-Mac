@@ -50,6 +50,11 @@ brew update
 brew upgrade --cask susops
 ```
 
+> [!NOTE]
+> homebrew tries to upgrade SusOps in-place, which may fail sometimes. If you get an error like
+> `error: redefinition of module 'SwiftBridging'`, please manually delete the app and install it again with
+> `brew install --cask susops`. No data is lost in the process.
+
 ### OR install manually
 
 1. Download the SusOps.zip file from the [latest release](https://github.com/mashb1t/susops-mac/releases)
