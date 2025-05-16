@@ -325,6 +325,12 @@ class SusOpsApp(rumps.App):
                 self.menu["Restart Proxy"].set_callback(self.restart_proxy)
                 self.menu["Test"]["Test Any"].set_callback(self.test_any)
                 self.menu["Test"]["Test All"].set_callback(self.test_all)
+            case ProcessState.STOPPED_PARTIALLY:
+                self.menu["Start Proxy"].set_callback(self.start_proxy)
+                self.menu["Stop Proxy"].set_callback(self.stop_proxy)
+                self.menu["Restart Proxy"].set_callback(self.restart_proxy)
+                self.menu["Test"]["Test Any"].set_callback(self.test_any)
+                self.menu["Test"]["Test All"].set_callback(self.test_all)
             case ProcessState.STOPPED:
                 self.menu["Start Proxy"].set_callback(self.start_proxy)
                 self.menu["Stop Proxy"].set_callback(None)
