@@ -162,7 +162,8 @@ def add_bin_to_path():
 
 
 def run_susops(command, show_alert=True):
-    result = subprocess.run(f"{script} {command}", shell=True, capture_output=True, encoding="utf-8",
+    susops_path = resource_path(os.path.join('bin', 'susops'))
+    result = subprocess.run(f"{susops_path} {command}", shell=True, capture_output=True, encoding="utf-8",
                             errors="ignore")
     if result.returncode != 0 and show_alert:
         alert_foreground("Error", result.stdout.strip())
@@ -171,7 +172,6 @@ def run_susops(command, show_alert=True):
 
 # Global instance of the app
 susops_app = None  # type: SusOpsApp|None
-script = resource_path(os.path.join('susops-cli', 'susops.sh'))
 
 
 def add_edit_menu_item():
