@@ -146,7 +146,7 @@ class ConfigHelper:
     def read_config(query: str, default):
         try:
             result = subprocess.check_output([ConfigHelper.yq_path, "e", query, ConfigHelper.config_path], encoding="utf-8").strip()
-            if result == "null" or result == "0":
+            if result == "null":
                 result = default
         except subprocess.CalledProcessError:
             result = default
