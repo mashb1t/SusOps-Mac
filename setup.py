@@ -25,7 +25,7 @@ DATA_FILES = [
     (os.path.join("images", "status"), [os.path.join("images", "status", f) for f in os.listdir(os.path.join("images", "status")) if os.path.isfile(os.path.join("images", "status", f))]),
     (os.path.join("images", "iconset"), [ICON_FILE, ICON_FOLDER]),
     "version.py",
-    (os.path.join("bin"), [os.path.join("bin", "yq"), SUSOPS_SRC_RENAMED]),
+    (os.path.join("bin"), [os.path.join("bin", "yq"), os.path.join("bin", "autossh"), SUSOPS_SRC_RENAMED]),
 ]
 
 OPTIONS = {
