@@ -124,21 +124,21 @@ class ConfigHelper:
 
     @staticmethod
     def get_domains():
-        result = ConfigHelper.read_config(".connections[].pac_hosts", [])
+        result = ConfigHelper.read_config(".connections[].pac_hosts[]", [])
         split_result = result.splitlines()
-        split_result = [item.lstrip("- ").strip() for item in split_result]
         return split_result
 
     @staticmethod
     def get_local_forwards():
         result = ConfigHelper.read_config(".connections[].forwards.local[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
-        # filter result items, remove all items equal to "'( → )'"
+        # filter result items, remove all items equal to "( → )" (this is the case when no remote forwards are set)
         result = [item for item in result.splitlines() if not item == "( → )"]
         return result
 
+    @staticmethod
     def get_remote_forwards():
         result = ConfigHelper.read_config(".connections[].forwards.remote[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
-        # filter result items, remove all items equal to "'( → )'"
+        # filter result items, remove all items equal to "( → )" (this is the case when no remote forwards are set)
         result = [item for item in result.splitlines() if not item == "( → )"]
         return result
 
