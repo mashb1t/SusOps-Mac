@@ -533,21 +533,8 @@ class SusOpsApp(rumps.App):
         run_susops("config")
 
     def start_proxy(self, _):
-        """Start the proxy in a fully detached background session using setsid."""
-        self.config = self.load_config()
-        shell = os.environ.get('SHELL', '/bin/bash')
-        try:
-            # Launch using bash -lc and detach from UI process
-            subprocess.Popen([
-                shell, '-c', f"{script} start"
-            ], stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                preexec_fn=os.setsid,
-                close_fds=True)
-            self.timer_check_state()
-        except Exception as e:
-            alert_foreground("Error starting proxy", str(e))
+        output, _ = run_susops("start")
+        self.timer_check_state()
 
     def stop_proxy(self, _):
         ports_flag = "--keep-ports" if not self.config['ephemeral_ports'] else ""
