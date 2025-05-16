@@ -539,7 +539,7 @@ class SusOpsApp(rumps.App):
     def stop_proxy(self, _):
         ports_flag = "--keep-ports" if not self.config['ephemeral_ports'] else ""
 
-        output, _ = run_susops(f"stop {ports_flag}")
+        output, _ = run_susops(f"stop --force {ports_flag}")
         self.timer_check_state()
 
     def restart_proxy(self, _):
