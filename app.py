@@ -289,6 +289,9 @@ class SusOpsApp(rumps.App):
         self._check_timer = rumps.Timer(self.timer_check_state, 5)
         self._check_timer.start()
 
+        self._add_edit_menu_item_timer = rumps.Timer(self.add_edit_menu_item_once, 1)
+        self._add_edit_menu_item_timer.start()
+
     def timer_check_state(self, _=None):
         # runs every 5s
         try:
@@ -337,6 +340,10 @@ class SusOpsApp(rumps.App):
                 self.menu["Restart Proxy"].set_callback(None)
                 self.menu["Test"]["Test Any"].set_callback(None)
                 self.menu["Test"]["Test All"].set_callback(None)
+
+    def add_edit_menu_item_once(self, _):
+        add_edit_menu_item()
+        self._add_edit_menu_item_timer.stop()
 
     def appearanceChanged_(self, _):
         # Called when user switches between light/dark mode
@@ -789,7 +796,6 @@ class SettingsPanel(NSPanel):
 
     def run(self):
         bring_app_to_front(self)
-        add_edit_menu_item()
 
 
 class GenericFieldPanel(NSPanel):
@@ -869,7 +875,6 @@ class GenericFieldPanel(NSPanel):
 
     def run(self):
         bring_app_to_front(self)
-        add_edit_menu_item()
         # reload connection tags
         if hasattr(self, 'connection'):
             self.connection.removeAllItems()
@@ -950,7 +955,6 @@ class GenericSelectPanel(NSPanel):
 
     def run(self):
         bring_app_to_front(self)
-        add_edit_menu_item()
 
     def cancel_(self, _):
         self.close()
