@@ -19,11 +19,16 @@ from Cocoa import (
     NSFontAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignmentCenter,
     NSForegroundColorAttributeName, NSColor, NSOnState, NSOffState,
     NSSegmentedControl, NSSegmentSwitchTrackingSelectOne, NSRegularControlSize, NSImageScaleProportionallyDown,
-    NSSwitchButton, NSPopUpButton, NSMenu, NSMenuItem
+    NSSwitchButton, NSPopUpButton, NSComboBox, NSMenu, NSMenuItem
 )
 from Foundation import NSBundle, NSData, NSDictionary
 
 from version import VERSION
+
+
+class FieldType(Enum):
+    TEXT = "text"
+    COMBOBOX = "combobox"
 
 
 class Appearance(Enum):
@@ -159,6 +164,34 @@ class ConfigHelper:
 
 def add_bin_to_path():
     os.environ['PATH'] = resource_path('bin') + os.pathsep + os.environ.get('PATH', '')
+
+
+from pathlib import Path
+from typing import List
+
+def get_ssh_hosts(config_path: Path = None) -> List[str]:
+    if config_path is None:
+        config_path = Path(os.path.expanduser("~/.ssh/config"))
+
+    host_pattern = re.compile(r'^\s*Host\s+(.*)$', re.IGNORECASE)
+    hosts = []
+
+    try:
+        with config_path.open('r') as f:
+            for raw in f:
+                line = raw.strip()
+                # skip blanks and comments
+                if not line or line.startswith('#'):
+                    continue
+                m = host_pattern.match(line)
+                if m:
+                    # a Host line can list multiple names/patterns
+                    for h in m.group(1).split():
+                        hosts.append(h)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"SSH config not found: {config_path!s}")
+
+    return hosts
 
 
 def run_susops(command, show_alert=True):
@@ -373,7 +406,7 @@ class SusOpsApp(rumps.App):
 
     def open_settings(self, _):
         if self._settings_panel is None:
-            frame = NSMakeRect(0, 0, 300, 250)
+            frame = NSMakeRect(0, 0, 300, 240)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._settings_panel = SettingsPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -415,7 +448,7 @@ class SusOpsApp(rumps.App):
             self.restart_proxy(None)
 
     def add_connection(self, sender, default_text=''):
-        frame_width = 360
+        frame_width = 440
         frame_height = 195
         if not self._connection_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
@@ -425,10 +458,10 @@ class SusOpsApp(rumps.App):
             )
             self._connection_panel.setTitle_("Add Connection")
             self._connection_panel.configure_fields([
-                ('tag', "Connection Tag:"),
-                ('host', "SSH Host:"),
-                ('socks_proxy_port', "SOCKS Proxy Port (optional):"),
-            ], label_width=170, input_start_x=190, hide_connection=True)
+                ('tag', "Connection Tag:", FieldType.TEXT),
+                ('host', "SSH Host:", FieldType.COMBOBOX),
+                ('socks_proxy_port', "SOCKS Proxy Port (optional):", FieldType.TEXT),
+            ], label_width=170, input_start_x=190, input_width=230, hide_connection=True)
         self._connection_panel.run()
 
     def add_domain(self, sender, default_text=''):
@@ -442,7 +475,7 @@ class SusOpsApp(rumps.App):
             )
             self._add_host_panel.setTitle_("Add Domain")
             self._add_host_panel.configure_fields([
-                ('host', "Domain:"),
+                ('host', "Domain:", FieldType.TEXT),
             ], label_width=80, input_start_x=100)
             self._add_host_panel.add_info_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
         self._add_host_panel.run()
@@ -456,9 +489,9 @@ class SusOpsApp(rumps.App):
             )
             self._add_local_forward_panel.setTitle_("Add Local Forward")
             self._add_local_forward_panel.configure_fields([
-                ('tag', 'Tag (optional):'),
-                ('local_port_field', 'Forward Local Port:'),
-                ('remote_port_field', 'To Remote Port:'),
+                ('tag', 'Tag (optional):', FieldType.TEXT),
+                ('local_port_field', 'Forward Local Port:', FieldType.TEXT),
+                ('remote_port_field', 'To Remote Port:', FieldType.TEXT),
             ], label_width=120, input_start_x=140)
         self._add_local_forward_panel.run()
 
@@ -471,9 +504,9 @@ class SusOpsApp(rumps.App):
             )
             self._add_remote_forward_panel.setTitle_("Add Remote Forward")
             self._add_remote_forward_panel.configure_fields([
-                ('tag', 'Tag (optional):'),
-                ('remote_port_field', 'Forward Remote Port:'),
-                ('local_port_field', 'To Local Port:'),
+                ('tag', 'Tag (optional):', FieldType.TEXT),
+                ('remote_port_field', 'Forward Remote Port:', FieldType.TEXT),
+                ('local_port_field', 'To Local Port:', FieldType.TEXT),
             ], label_width=130, input_start_x=150)
         self._add_remote_forward_panel.run()
 
@@ -801,7 +834,7 @@ class GenericFieldPanel(NSPanel):
 
         return self
 
-    def configure_fields(self, field_defs, label_width: int = 150, input_start_x: int = 170, input_width: int = 150,
+    def configure_fields(self, field_defs, label_width: int = 150, input_start_x: int = 170, input_width: int = 160,
                          hide_connection: bool = False):
         """
         field_defs = [(attr_name, label_text), ...]   # order = top → bottom
@@ -822,37 +855,41 @@ class GenericFieldPanel(NSPanel):
             lbl.setEditable_(False)
             content.addSubview_(lbl)
 
-            self.connection = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
+            self.connection = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width, 24))
             self.connection.setPullsDown_(False)
             self.connection.addItemsWithTitles_(ConfigHelper.get_connection_tags())
             self.connection.selectItemAtIndex_(0)
             content.addSubview_(self.connection)
         y -= 40
 
-        for attr, label in field_defs:
+        for attr, label, type in field_defs:
             lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(15, y - 2, label_width, 24))
             lbl.setStringValue_(label)
             lbl.setAlignment_(2)
             lbl.setBezeled_(False)
             lbl.setDrawsBackground_(False)
             lbl.setEditable_(False)
-            self.contentView().addSubview_(lbl)
-
-            fld = NSTextField.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 10, 24))
-            self.contentView().addSubview_(fld)
+            content.addSubview_(lbl)
+            if type == FieldType.COMBOBOX:
+                fld = NSComboBox.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 3, 24))
+                fld.addItemsWithObjectValues_(ConfigHelper.get_connection_tags())
+            else:
+                fld = NSTextField.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width, 24))
+            content.addSubview_(fld)
             setattr(self, attr, fld)
             y -= 40
 
         # --- Save/Cancel Buttons ---
-        x = input_start_x - 5
-        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x, 18, 80, 30))
+        button_width = 80
+        button_spacing = 7
+        cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(input_start_x - 5, 16, button_width, 30))
         cancel_btn.setTitle_("Cancel")
         cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self)
         cancel_btn.setAction_("cancel:")
         content.addSubview_(cancel_btn)
 
-        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(x + 90, 18, 80, 30))
+        add_btn = NSButton.alloc().initWithFrame_(NSMakeRect(input_start_x + input_width - button_width + button_spacing, 16, button_width, 30))
         add_btn.setTitle_("Add")
         add_btn.setBezelStyle_(1)
         add_btn.setKeyEquivalent_("\r")
@@ -1112,6 +1149,17 @@ class AboutPanel(NSPanel):
 
 
 class AddConnectionPanel(GenericFieldPanel):
+
+    def run(self):
+        objc.super(AddConnectionPanel, self).run()
+
+        try:
+            ssh_hosts = get_ssh_hosts()
+        except Exception as e:
+            ssh_hosts = []
+
+        self.host.removeAllItems()
+        self.host.addItemsWithObjectValues_(ssh_hosts)
 
     def add_(self, _):
         tag = self.tag.stringValue().strip()
