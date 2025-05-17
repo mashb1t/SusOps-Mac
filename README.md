@@ -1,11 +1,11 @@
 <p align="center">
-    <img src="images/iconset/susops.iconset/icon_512.png" alt="Menu" height="200" />
+    <img src="images/logos/icon.png" alt="Menu" height="200" />
 </p>
 
-# SusOps App for macOS
+# SusOps for macOS - SSH Utilities & SOCKS5 Operations
 
-A native-feeling **menu-bar app** for the [**SusOps CLI**](https://github.com/mashb1t/susops-cli) SSH–proxy
-and forwarding toolkit. **SusOps CLI** is already bundled, no need to manually download it (again).
+A native-feeling **menu-bar app** for the [**SusOps CLI**](https://github.com/mashb1t/susops-cli) SSH–proxy and forwarding toolkit. 
+**SusOps CLI** is already bundled, no need to manually download it (again).
 
 Built with [rumps](https://github.com/jaredks/rumps), the app lets you start/stop the SusOps SOCKS proxy, add
 local / remote port-forwards, and tweak settings without touching a terminal.
