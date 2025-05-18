@@ -1104,7 +1104,8 @@ class AboutPanel(NSPanel):
         link_text = (
             "<a href='https://github.com/mashb1t/susops-mac' style='text-decoration: none;'>GitHub</a> | "
             "<a href='https://github.com/mashb1t/susops-cli' style='text-decoration: none;'>CLI</a> | "
-            "<a href='https://github.com/sponsors/mashb1t' style='text-decoration: none;'>Sponsor</a>"
+            "<a href='https://github.com/sponsors/mashb1t' style='text-decoration: none;'>Sponsor</a> | "
+            "<a href='https://github.com/mashb1t/susops-mac/issues/new' style='text-decoration: none;'>Report a Bug</a>"
         )
         # convert HTML to attributed string
         html_bytes = link_text.encode('utf-8')
