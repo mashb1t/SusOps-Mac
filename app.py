@@ -315,17 +315,30 @@ class SusOpsApp(rumps.App):
             None,
             rumps.MenuItem("Reset All", callback=self.reset),
             None,
-            rumps.MenuItem("About", callback=self.open_about),
+            rumps.MenuItem("About SusOps", callback=self.open_about),
             rumps.MenuItem("Quit", callback=self.quit_app, key="q")
         ]
 
-        self._check_timer = rumps.Timer(self.timer_check_state, 5)
+        self._check_timer = rumps.Timer(self.check_state_and_update_menu, 5)
+
+        self._startup_check_timer = rumps.Timer(self.async_startup_check, 0.1)
+        self._startup_check_timer.start()
+
+    def async_startup_check(self, _):
+        add_edit_menu_item()
+        status, output, returncode = self.check_state_and_update_menu()
+        # check if output has "no default connection found"
+        if status == ProcessState.ERROR and "no default connection found" in output:
+            # show welcome dialog for connection setup
+            alert_foreground("🎉 Welcome to SusOps 🎉",
+                             "To get started, please follow these steps:\n\n"
+                             "1. Add a connection\n"
+                             "2. Start the proxy\n\n"
+                             "If you need help, please check the documentation in 'About' → 'Github'.", )
+        self._startup_check_timer.stop()
         self._check_timer.start()
 
-        self._add_edit_menu_item_timer = rumps.Timer(self.add_edit_menu_item_once, 1)
-        self._add_edit_menu_item_timer.start()
-
-    def timer_check_state(self, _=None):
+    def check_state_and_update_menu(self, _=None):
         # runs every 5s
         try:
             output, returncode = run_susops("ps", False)
@@ -351,7 +364,7 @@ class SusOpsApp(rumps.App):
         self.process_state = new_state
         self.update_icon()
 
-        self.menu["Status"].title = f"SusOps is {self.process_state.value.lower().replace("_", " ")}"
+        self.menu["Status"].title = f"Status: {self.process_state.value.lower().replace("_", " ")}"
         self.menu["Status"].icon = os.path.join(self.images_dir, "status", self.process_state.value.lower() + ".svg")
 
         match self.process_state:
@@ -373,10 +386,14 @@ class SusOpsApp(rumps.App):
                 self.menu["Restart Proxy"].set_callback(None)
                 self.menu["Test"]["Test Any"].set_callback(None)
                 self.menu["Test"]["Test All"].set_callback(None)
+            case ProcessState.ERROR:
+                self.menu["Start Proxy"].set_callback(None)
+                self.menu["Stop Proxy"].set_callback(None)
+                self.menu["Restart Proxy"].set_callback(None)
+                self.menu["Test"]["Test Any"].set_callback(None)
+                self.menu["Test"]["Test All"].set_callback(None)
 
-    def add_edit_menu_item_once(self, _):
-        add_edit_menu_item()
-        self._add_edit_menu_item_timer.stop()
+        return self.process_state, output, returncode
 
     def appearanceChanged_(self, _):
         # Called when user switches between light/dark mode
@@ -567,18 +584,18 @@ class SusOpsApp(rumps.App):
 
     def start_proxy(self, _):
         output, _ = run_susops("start")
-        self.timer_check_state()
+        self.check_state_and_update_menu()
 
     def stop_proxy(self, _):
         ports_flag = "--keep-ports" if not self.config['ephemeral_ports'] else ""
 
         output, _ = run_susops(f"stop {ports_flag}")
-        self.timer_check_state()
+        self.check_state_and_update_menu()
 
     def restart_proxy(self, _):
         self.config = self.load_config()
         output, _ = run_susops("restart")
-        self.timer_check_state()
+        self.check_state_and_update_menu()
 
     def check_status(self, _):
         output, _ = run_susops("ps", False)
