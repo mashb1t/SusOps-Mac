@@ -686,7 +686,7 @@ class SettingsPanel(NSPanel):
         y -= 30
         self.stop_on_quit_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(input_margin_left, y, input_width, element_height))
         self.stop_on_quit_checkbox.setButtonType_(NSSwitchButton)
-        self.stop_on_quit_checkbox.setTitle_("Stop SusOps Proxy On Quit")
+        self.stop_on_quit_checkbox.setTitle_("Stop Proxy On Quit")
 
         self.stop_on_quit_checkbox.setTarget_(self)
         content.addSubview_(self.stop_on_quit_checkbox)
