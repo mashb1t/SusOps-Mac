@@ -1232,7 +1232,7 @@ class AddHostPanel(GenericFieldPanel):
         cmd = f"-c \"{connection}\" add {host}"
         output, returncode = run_susops(cmd)
         if returncode == 0:
-            alert_foreground("Success", output + "\nPlease re-apply your browser proxy settings.")
+            alert_foreground("Success", output)
             self.close()
             self.host.setStringValue_("")
 
