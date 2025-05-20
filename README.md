@@ -47,13 +47,13 @@ For updating, simply run these commands:
 
 ```bash
 brew update
-brew upgrade --cask susops
+brew install --cask susops
 ```
 
 > [!NOTE]
-> homebrew tries to upgrade SusOps in-place, which may fail sometimes. If you get an error like
-> `error: redefinition of module 'SwiftBridging'`, please manually delete the app and install it again with
-> `brew install --cask susops`. No data is lost in the process.
+> When using `brew upgrade --cask susops`, homebrew tries to upgrade SusOps in-place, which fails due to a rumps incompatibility with swift.
+> You will get an error like `error: redefinition of module 'SwiftBridging'`.
+> Please manually delete the app and install it again with `brew install --cask susops`. No data is lost in the process.
 
 ### OR install manually
 
