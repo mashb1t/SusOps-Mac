@@ -135,14 +135,14 @@ class ConfigHelper:
 
     @staticmethod
     def get_local_forwards():
-        result = ConfigHelper.read_config(".connections[].forwards.local[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
+        result = ConfigHelper.read_config(".connections[].forwards.local[] | \"\\(.tag) (\\((.src_port // .src)) → \\((.dst_port // .dst)))\"", [])
         # filter result items, remove all items equal to "( → )" (this is the case when no remote forwards are set)
         result = [item for item in result.splitlines() if not item == "( → )"]
         return result
 
     @staticmethod
     def get_remote_forwards():
-        result = ConfigHelper.read_config(".connections[].forwards.remote[] | \"\\(.tag) (\\(.src) → \\(.dst))\"", [])
+        result = ConfigHelper.read_config(".connections[].forwards.remote[] | \"\\(.tag) (\\((.src_port // .src)) → \\((.dst_port // .dst)))\"", [])
         # filter result items, remove all items equal to "( → )" (this is the case when no remote forwards are set)
         result = [item for item in result.splitlines() if not item == "( → )"]
         return result
@@ -233,6 +233,9 @@ def add_edit_menu_item():
     edit_menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Select All", "selectAll:", "a"))
 
     main_menu.addItem_(edit_item)
+
+def get_bind_addresses():
+    return ["localhost", "172.17.0.1", "0.0.0.0"]
 
 class SusOpsApp(rumps.App):
     def __init__(self, icon_dir=None):
@@ -499,7 +502,7 @@ class SusOpsApp(rumps.App):
 
     def add_local_forward(self, _):
         if not self._add_local_forward_panel:
-            frame = NSMakeRect(0, 0, 320, 230)
+            frame = NSMakeRect(0, 0, 340, 310)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._add_local_forward_panel = LocalForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -509,12 +512,14 @@ class SusOpsApp(rumps.App):
                 ('tag', 'Tag (optional):', FieldType.TEXT),
                 ('local_port_field', 'Forward Local Port:', FieldType.TEXT),
                 ('remote_port_field', 'To Remote Port:', FieldType.TEXT),
-            ], label_width=120, input_start_x=140)
+                ('local_addr_field', 'Local Bind (optional):', FieldType.COMBOBOX),
+                ('remote_addr_field', 'Remote Bind (optional):', FieldType.COMBOBOX),
+            ], label_width=140, input_start_x=160)
         self._add_local_forward_panel.run()
 
     def add_remote_forward(self, _):
         if not self._add_remote_forward_panel:
-            frame = NSMakeRect(0, 0, 330, 230)
+            frame = NSMakeRect(0, 0, 340, 310)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._add_remote_forward_panel = RemoteForwardPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
@@ -524,7 +529,9 @@ class SusOpsApp(rumps.App):
                 ('tag', 'Tag (optional):', FieldType.TEXT),
                 ('remote_port_field', 'Forward Remote Port:', FieldType.TEXT),
                 ('local_port_field', 'To Local Port:', FieldType.TEXT),
-            ], label_width=130, input_start_x=150)
+                ('remote_addr_field', 'Remote Bind (optional):', FieldType.COMBOBOX),
+                ('local_addr_field', 'Local Bind (optional):', FieldType.COMBOBOX),
+            ], label_width=140, input_start_x=160)
         self._add_remote_forward_panel.run()
 
     def remove_connection(self, _):
@@ -889,7 +896,6 @@ class GenericFieldPanel(NSPanel):
             content.addSubview_(lbl)
             if type == FieldType.COMBOBOX:
                 fld = NSComboBox.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width + 3, 24))
-                fld.addItemsWithObjectValues_(ConfigHelper.get_connection_tags())
             else:
                 fld = NSTextField.alloc().initWithFrame_(NSMakeRect(input_start_x, y, input_width, 24))
             content.addSubview_(fld)
@@ -1238,13 +1244,22 @@ class AddHostPanel(GenericFieldPanel):
 
 
 class LocalForwardPanel(GenericFieldPanel):
-    def add_(self, _):
+    def run(self):
+        objc.super(LocalForwardPanel, self).run()
 
+        self.local_addr_field.removeAllItems()
+        self.local_addr_field.addItemsWithObjectValues_(get_bind_addresses())
+        self.remote_addr_field.removeAllItems()
+        self.remote_addr_field.addItemsWithObjectValues_(get_bind_addresses())
+
+    def add_(self, _):
         connection_item = self.connection.selectedItem()
         connection = connection_item.title() if connection_item else None
         tag = self.tag.stringValue().strip()
         local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
+        local_addr = self.local_addr_field.stringValue().strip()
+        remote_addr = self.remote_addr_field.stringValue().strip()
 
         if not FormValidator.validate_empty_with_alert(connection, "Connection"):
             return
@@ -1255,7 +1270,7 @@ class LocalForwardPanel(GenericFieldPanel):
         if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
 
-        cmd = f"-c \"{connection}\" add -l {local_port} {remote_port} \"{tag}\""
+        cmd = f"-c \"{connection}\" add -l {local_port} {remote_port} \"{tag}\" \"{local_addr}\" \"{remote_addr}\""
         output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
@@ -1266,12 +1281,22 @@ class LocalForwardPanel(GenericFieldPanel):
 
 
 class RemoteForwardPanel(GenericFieldPanel):
+    def run(self):
+        objc.super(RemoteForwardPanel, self).run()
+
+        self.local_addr_field.removeAllItems()
+        self.local_addr_field.addItemsWithObjectValues_(get_bind_addresses())
+        self.remote_addr_field.removeAllItems()
+        self.remote_addr_field.addItemsWithObjectValues_(get_bind_addresses())
+
     def add_(self, _):
         connection = self.connection.selectedItem().title()
 
         tag = self.tag.stringValue().strip()
-        local_port = self.local_port_field.stringValue().strip()
         remote_port = self.remote_port_field.stringValue().strip()
+        local_port = self.local_port_field.stringValue().strip()
+        remote_addr = self.remote_addr_field.stringValue().strip()
+        local_addr = self.local_addr_field.stringValue().strip()
 
         if not FormValidator.validate_port_with_alert(remote_port, "Remote Port"):
             return
@@ -1279,7 +1304,7 @@ class RemoteForwardPanel(GenericFieldPanel):
         if not FormValidator.validate_port_with_alert(local_port, "Local Port"):
             return
 
-        cmd = f"-c \"{connection}\" add -r {remote_port} {local_port} \"{tag}\""
+        cmd = f"-c \"{connection}\" add -r {remote_port} {local_port} \"{tag}\" \"{remote_addr}\" \"{local_addr}\""
         output, returncode = run_susops(cmd)
         if returncode == 0:
             susops_app.show_restart_dialog("Success", output)
