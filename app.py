@@ -285,13 +285,13 @@ class SusOpsApp(rumps.App):
             None,
             (rumps.MenuItem("Add"), [
                 rumps.MenuItem("Add Connection", callback=self.add_connection),
-                rumps.MenuItem("Add Domain", callback=self.add_domain),
+                rumps.MenuItem("Add Domain / IP / CIDR", callback=self.add_host),
                 rumps.MenuItem("Add Local Forward", callback=self.add_local_forward),
                 rumps.MenuItem("Add Remote Forward", callback=self.add_remote_forward),
             ]),
             (rumps.MenuItem("Remove"), [
                 rumps.MenuItem("Remove Connection", callback=self.remove_connection),
-                rumps.MenuItem("Remove Domain", callback=self.remove_domain),
+                rumps.MenuItem("Remove Domain / IP / CIDR", callback=self.remove_host),
                 rumps.MenuItem("Remove Local Forward", callback=self.remove_local_forward),
                 rumps.MenuItem("Remove Remote Forward", callback=self.remove_remote_forward),
             ]),
@@ -484,20 +484,22 @@ class SusOpsApp(rumps.App):
             ], label_width=170, input_start_x=190, input_width=230, hide_connection=True)
         self._connection_panel.run()
 
-    def add_domain(self, sender, default_text=''):
-        frame_width = 280
-        frame_height = 195
+    def add_host(self, sender, default_text=''):
+        frame_width = 300
+        frame_height = 220
         if not self._add_host_panel:
             frame = NSMakeRect(0, 0, frame_width, frame_height)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._add_host_panel = AddHostPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._add_host_panel.setTitle_("Add Domain")
+            self._add_host_panel.setTitle_("Add Domain / IP / CIDR")
             self._add_host_panel.configure_fields([
-                ('host', "Domain:", FieldType.TEXT),
+                ('host', "Host:", FieldType.TEXT),
             ], label_width=80, input_start_x=100)
-            self._add_host_panel.add_info_label("This domain and one level of subdomains \nwill be added to the PAC rules.", frame_width, frame_height)
+            self._add_host_panel.add_info_label("Host can be:\n"
+                                                "* Domain (subdomains & wildcards supported)\n"
+                                                "* IP address (CIDR notation supported)", frame_width, frame_height)
         self._add_host_panel.run()
 
     def add_local_forward(self, _):
@@ -546,15 +548,15 @@ class SusOpsApp(rumps.App):
         self._remove_connection_panel.update_items(ConfigHelper.get_connection_tags())
         self._remove_connection_panel.run()
 
-    def remove_domain(self, _):
+    def remove_host(self, _):
         if not self._remove_host_panel:
             frame = NSMakeRect(0, 0, 255, 105)
             style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
             self._remove_host_panel = RemoveDomainPanel.alloc().initWithContentRect_styleMask_backing_defer_(
                 frame, style, NSBackingStoreBuffered, False
             )
-            self._remove_host_panel.setTitle_("Remove Domain")
-            self._remove_host_panel.configure_field("Domain:", label_width = 55, input_start_x = 75)
+            self._remove_host_panel.setTitle_("Remove Domain / IP / CIDR")
+            self._remove_host_panel.configure_field("Host:", label_width = 55, input_start_x = 75)
         self._remove_host_panel.update_items(ConfigHelper.get_domains())
         self._remove_host_panel.run()
 
@@ -1214,11 +1216,11 @@ class AddHostPanel(GenericFieldPanel):
 
     def add_info_label(self, text, frame_width, frame_height):
         width = frame_width - 15 * 2
-        height = 18 * 2
+        height = 18 + 18 * text.count('\n')
         frame_height -= 20 + height
         label = NSTextField.alloc().initWithFrame_(NSMakeRect(15, frame_height, width, height))
         label.setStringValue_(text)
-        label.setAlignment_(1)
+        label.setAlignment_(0)
         label.setBezeled_(False)
         label.setDrawsBackground_(False)
         label.setEditable_(False)
