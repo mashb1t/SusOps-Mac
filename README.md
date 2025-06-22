@@ -101,6 +101,10 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 |--------------|---------------------------------|
 | `~/.susops/` | Same config files the CLI uses. |
 
+## How To Use Susops As Docker Proxy
+
+See [SusOps CLI Readme](https://github.com/mashb1t/susops-cli?tab=readme-ov-file#how-to-use-susops-as-docker-proxy)
+
 ## Troubleshooting
 
 | Problem                                                         | Solution                                                                                                                                                                                                                                                                                                                                                       |
@@ -112,6 +116,7 @@ The build embeds **`susops.sh`** and all logo assets under `Contents/Resources/`
 | **Chrome doesn't pick up my added domains**                     | Make sure you completely close Chrome and open it again using the **Launch Browser** menu item. Then, open the Chrome Proxy settings and click **Re-apply settings**.                                                                                                                                                                                          |
 | **Firefox doesn't pick up my added domains**                    | Make sure you completely close Firefox and open it again using the **Launch Browser** menu item.                                                                                                                                                                                                                                                               |
 | **Clicked "Don't Allow" for Login Items when opening settings** | You can manually re-enable the **System Events** in **System Settings** > **Privacy & Security** > **Automation** > **SusOps**. Check **Launch at Login**, save the config and you should find it in **System Settings** > **General** > **Login Items & Extensions**                                                                                          |
+| **Docker Desktop doesn't use the domains configured in SusOps** | See [SusOps CLI Readme](https://github.com/mashb1t/susops-cli?tab=readme-ov-file#how-to-use-susops-as-docker-proxy)                                                                                                                                                                                                                                            |
 | **Everything else**                                             | see [Troubleshooting Guide SusOps CLI](https://github.com/mashb1t/susops-cli?tab=readme-ov-file#troubleshooting) or [Report a Bug](https://github.com/mashb1t/susops-mac/issues/new).                                                                                                                                                                          |
 
 ## Contributing
